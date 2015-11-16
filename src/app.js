@@ -1,52 +1,11 @@
 var React = require('react')
 var ReactDOM = require('react-dom');
 var Dispatcher = require('./dispatcher/AppDispatcher.js');
-var Input = React.createFactory(require('./components/input-type-file.js'));
+var Uploader = React.createFactory(require('./components/uploader.js'));
 var FileStore = require('./stores/FileStore.js');
 
-
-/**
-var fileStore = {
-  state: null
-};
-
-var formStore = {
-  isValid: null
-};
-
-var fooStore = {
-  isValid: null
-};
-
-formStore.dispatchToken = uploadDispatcher.register(function(payload) {
-  if (payload.actionType === 'state-update') {
-    uploadDispatcher.waitFor([fileStore.dispatchToken]);
-    console.log(2);
-  }
-});
-
-fooStore.dispatchToken = uploadDispatcher.register(function(payload) {
-  if (payload.actionType === 'state-update') {
-    uploadDispatcher.waitFor([formStore.dispatchToken]);
-    console.log(3);
-  }
-});
-
-fileStore.dispatchToken = uploadDispatcher.register(function(payload) {
-  if (payload.actionType === 'state-update') {
-    console.log(1);
-  }
-});
-
-
-uploadDispatcher.dispatch({
-  actionType: 'state-update',
-  newState: 'uploading'
-});
-**/
-
 ReactDOM.render(
-  <Input
+  <Uploader
     uploadUrl='/updown'
   />,
   document.getElementById('uploader')
