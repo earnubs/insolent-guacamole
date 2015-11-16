@@ -48,7 +48,7 @@ var FileStore = assign({}, EventEmitter.prototype, {
   dispatcherToken: Dispatcher.register(function(payload) {
     var state;
 
-    console.log(payload);
+    //console.log(payload);
 
     if (payload.actionType === 'file-update') {
 

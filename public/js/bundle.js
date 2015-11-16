@@ -20627,9 +20627,61 @@ process.umask = function() { return 0; };
 'use strict';
 
 var React = require('react');
+var ReactDOM = require('react-dom');
+var Dispatcher = require('./dispatcher/AppDispatcher.js');
+var Uploader = React.createFactory(require('./components/uploader.js'));
+var FileStore = require('./stores/FileStore.js');
+
+ReactDOM.render(React.createElement(Uploader, {
+  uploadUrl: '/updown'
+}), document.getElementById('uploader'));
+
+/**
+ *
+ * 1. [user] upload file
+ * 2. on success, enable form for submission
+ * 3. [user] submit form
+ * 4. on success, poll scan results
+ * 5. on success, redirect to application detail view
+ *
+ * 1. [user] upload file
+ * 2. on failure, get new upload signature
+ * 3. reup file
+ * 3. on failure, show error message
+ *
+ * 1. [user] upload file
+ * 2. on success, enable form for submission
+ * 3. [user] submit form
+ * 4. on failure, render form errors || handle bad response
+ *
+ * 1. [user] upload file
+ * 2. on success, enable form for submission
+ * 3. [user] submit form
+ * 4. on success, poll scan results
+ * 5. on fail, show error || check again
+ *
+ * FileInput
+ * * should validate and upload file handling success and failure
+ *   events
+ * * should emit success and failure events
+ *
+ * Form
+ * * should validate and submit handling success and failure
+ * * should emit success and faiure events
+ *
+ * Scan Poller
+ * * should scan for package scan results and act on completion event
+ *
+ *
+ *
+ */
+
+},{"./components/uploader.js":167,"./dispatcher/AppDispatcher.js":168,"./stores/FileStore.js":169,"react":162,"react-dom":6}],166:[function(require,module,exports){
+'use strict';
+
+var React = require('react');
 require('es6-promise').polyfill();
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
-var FileStore = require('../stores/FileStore.js');
 
 module.exports = React.createClass({
 
@@ -20643,36 +20695,66 @@ module.exports = React.createClass({
     return {
       multiple: false,
       accept: '.snap, .click',
-      placeholder: 'click or drop to upload package',
-      maxRetry: 1 // retry after error, then fail
+      maxRetries: 1 // retry after error, then fail
     };
   },
 
   getInitialState: function getInitialState() {
     return {
-      name: null,
+      // initial state: ?
       progress: 0,
-      state: false,
-      retry: 0
+      retries: 0
     };
   },
 
   componentDidMount: function componentDidMount() {
-    FileStore.addChangeListener(this._onChange);
-  },
+    var _this = this;
 
-  componentWillUnmount: function componentWillUnmount() {
-    FileStore.removeChangeListener(this._onChange);
-  },
+    this.xhr = new XMLHttpRequest();
 
-  _onChange: function _onChange(e) {
-    console.log(FileStore.getAll());
-    this.setState(FileStore.getAll());
+    this.xhr.onload = function (e) {
+      // XXX handle bad response
+      var response = JSON.parse(e.target.responseText);
+      var uploadId = response.upload_id;
+      Dispatcher.dispatch({
+        actionType: 'file-update',
+        state: 'uploaded',
+        uploadId: uploadId
+      });
+    };
+
+    this.xhr.upload.onprogress = function (e) {
+      _this.setState({
+        progress: e.lengthComputable ? e.loaded / e.total * 100 | 0 : 0
+      });
+      Dispatcher.dispatch({
+        actionType: 'file-update',
+        state: 'uploading'
+      });
+    };
+
+    this.xhr.upload.onerror = function (e) {
+      _this.setState(function (previousState, currentProps) {
+        return { retries: previousState.retry + 1 };
+      });
+      Dispatcher.dispatch({
+        actionType: 'file-update',
+        state: 'retrying'
+      });
+    };
   },
 
   change: function change(e) {
     var file = e.target.files[0];
-    //this.setState({file: file});
+
+    if (!file) {
+      return;
+    }
+
+    this.setState({
+      name: file.name,
+      progress: 0
+    });
 
     Dispatcher.dispatch({
       actionType: 'file-update',
@@ -20689,44 +20771,9 @@ module.exports = React.createClass({
     var data = new FormData();
     data.append('package', file);
 
-    var xhr = new XMLHttpRequest();
+    this.xhr.open('POST', this.props.uploadUrl, true);
 
-    xhr.open('POST', this.props.uploadUrl, true);
-
-    xhr.onload = function (e) {
-      // XXX handle bad response
-      var response = JSON.parse(e.target.responseText);
-      var uploadId = response.upload_id;
-      Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'uploaded',
-        uploadId: uploadId
-      });
-    };
-
-    xhr.upload.onprogress = function (e) {
-      Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'uploading',
-        progress: e.lengthComputable ? e.loaded / e.total * 100 | 0 : 0
-      });
-    };
-
-    xhr.upload.onerror = function () {
-      this.setState(function (previousState, currentProps) {
-        return { retry: previousState.retry + 1 };
-      });
-      Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'retrying'
-      });
-    };
-
-    xhr.onreadystatechange = function () {
-      console.log(xhr.readyState);
-    };
-
-    xhr.send(data);
+    this.xhr.send(data);
   },
 
   handleClick: function handleClick(e) {
@@ -20739,7 +20786,7 @@ module.exports = React.createClass({
   render: function render() {
     return React.createElement(
       'div',
-      { onClick: this.handleClick, style: { backgroundColor: 'silver', height: 20 } },
+      { onClick: this.handleClick, style: { backgroundColor: 'silver' } },
       React.createElement('input', {
         type: 'file',
         ref: 'fileInput',
@@ -20757,24 +20804,85 @@ module.exports = React.createClass({
         'div',
         null,
         this.state.progress
-      ),
-      React.createElement(
-        'div',
-        null,
-        this.state.state
       )
     );
   }
 });
 
-},{"../dispatcher/AppDispatcher.js":166,"../stores/FileStore.js":167,"es6-promise":1,"react":162}],166:[function(require,module,exports){
+},{"../dispatcher/AppDispatcher.js":168,"es6-promise":1,"react":162}],167:[function(require,module,exports){
+'use strict';
+
+var React = require('react');
+var ReactDOM = require('react-dom');
+var Dispatcher = require('../dispatcher/AppDispatcher.js');
+var Input = React.createFactory(require('./input-type-file.js'));
+var FileStore = require('../stores/FileStore.js');
+
+function toggleSubmit() {
+  // activate or deactivate the submit button depending on state of form and upload
+}
+
+function checkFormValidity(form) {
+  var elements = form.elements;
+  var i;
+  var isValid = true;
+
+  for (i = elements.length; i--;) {
+    if (!elements[i].checkValidity()) {
+      isValid = false;
+      break;
+    }
+  }
+
+  return isValid;
+}
+
+var Uploader = React.createClass({
+
+  getInitialState: function getInitialState() {
+    return FileStore.getAll();
+  },
+
+  componentDidMount: function componentDidMount() {
+    if (this.props.formSelector) {
+      var formEl = document.getElementById(this.props.formSelector);
+      formEl.addEventListener('change', function (e) {
+        console.log(checkFormValidity(e.currentTarget));
+        // action to update the FormStore
+      }, false);
+    }
+    FileStore.addChangeListener(this._onChange);
+  },
+
+  componentWillUnmount: function componentWillUnmount() {
+    // XXX remove form listener
+    FileStore.removeChangeListener(this._onChange);
+  },
+
+  _onChange: function _onChange() {
+    //console.log('xxx');
+    //console.log(FileStore.getAll());
+    this.setState(FileStore.getAll());
+  },
+
+  render: function render() {
+    return React.createElement(Input, {
+      uploadUrl: this.props.uploadUrl
+    });
+  }
+
+});
+
+module.exports = Uploader;
+
+},{"../dispatcher/AppDispatcher.js":168,"../stores/FileStore.js":169,"./input-type-file.js":166,"react":162,"react-dom":6}],168:[function(require,module,exports){
 'use strict';
 
 var Dispatcher = require('flux').Dispatcher;
 
 module.exports = new Dispatcher();
 
-},{"flux":2}],167:[function(require,module,exports){
+},{"flux":2}],169:[function(require,module,exports){
 'use strict';
 
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
@@ -20819,7 +20927,7 @@ var FileStore = assign({}, EventEmitter.prototype, {
   dispatcherToken: Dispatcher.register(function (payload) {
     var state;
 
-    console.log(payload);
+    //console.log(payload);
 
     if (payload.actionType === 'file-update') {
 
@@ -20845,97 +20953,4 @@ var FileStore = assign({}, EventEmitter.prototype, {
 
 module.exports = FileStore;
 
-},{"../dispatcher/AppDispatcher.js":166,"events":163,"object-assign":5}],168:[function(require,module,exports){
-'use strict';
-
-var React = require('react');
-var ReactDOM = require('react-dom');
-var Dispatcher = require('./dispatcher/AppDispatcher.js');
-var Input = React.createFactory(require('./components/input-type-file.js'));
-var FileStore = require('./stores/FileStore.js');
-
-/**
-var fileStore = {
-  state: null
-};
-
-var formStore = {
-  isValid: null
-};
-
-var fooStore = {
-  isValid: null
-};
-
-formStore.dispatchToken = uploadDispatcher.register(function(payload) {
-  if (payload.actionType === 'state-update') {
-    uploadDispatcher.waitFor([fileStore.dispatchToken]);
-    console.log(2);
-  }
-});
-
-fooStore.dispatchToken = uploadDispatcher.register(function(payload) {
-  if (payload.actionType === 'state-update') {
-    uploadDispatcher.waitFor([formStore.dispatchToken]);
-    console.log(3);
-  }
-});
-
-fileStore.dispatchToken = uploadDispatcher.register(function(payload) {
-  if (payload.actionType === 'state-update') {
-    console.log(1);
-  }
-});
-
-
-uploadDispatcher.dispatch({
-  actionType: 'state-update',
-  newState: 'uploading'
-});
-**/
-
-ReactDOM.render(React.createElement(Input, {
-  uploadUrl: '/updown'
-}), document.getElementById('uploader'));
-
-/**
- *
- * 1. [user] upload file
- * 2. on success, enable form for submission
- * 3. [user] submit form
- * 4. on success, poll scan results
- * 5. on success, redirect to application detail view
- *
- * 1. [user] upload file
- * 2. on failure, get new upload signature
- * 3. reup file
- * 3. on failure, show error message
- *
- * 1. [user] upload file
- * 2. on success, enable form for submission
- * 3. [user] submit form
- * 4. on failure, render form errors || handle bad response
- *
- * 1. [user] upload file
- * 2. on success, enable form for submission
- * 3. [user] submit form
- * 4. on success, poll scan results
- * 5. on fail, show error || check again
- *
- * FileInput
- * * should validate and upload file handling success and failure
- *   events
- * * should emit success and failure events
- *
- * Form
- * * should validate and submit handling success and failure
- * * should emit success and faiure events
- *
- * Scan Poller
- * * should scan for package scan results and act on completion event
- *
- *
- *
- */
-
-},{"./components/input-type-file.js":165,"./dispatcher/AppDispatcher.js":166,"./stores/FileStore.js":167,"react":162,"react-dom":6}]},{},[168]);
+},{"../dispatcher/AppDispatcher.js":168,"events":163,"object-assign":5}]},{},[165]);

@@ -1,7 +1,6 @@
 var React = require('react');
 require('es6-promise').polyfill();
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
-var FileStore = require('../stores/FileStore.js');
 
 module.exports = React.createClass({
 
@@ -15,36 +14,64 @@ module.exports = React.createClass({
     return {
       multiple: false,
       accept: '.snap, .click',
-      placeholder: 'click or drop to upload package',
-      maxRetry: 1 // retry after error, then fail
+      maxRetries: 1 // retry after error, then fail
     };
   },
 
   getInitialState: function() {
     return {
-      name: null,
+      // initial state: ?
       progress: 0,
-      state: false,
-      retry: 0
+      retries: 0
     }
   },
 
   componentDidMount: function() {
-    FileStore.addChangeListener(this._onChange);
-  },
+    this.xhr = new XMLHttpRequest();
 
-  componentWillUnmount: function() {
-    FileStore.removeChangeListener(this._onChange);
-  },
+    this.xhr.onload = (e) => {
+      // XXX handle bad response
+      var response = JSON.parse(e.target.responseText);
+      var uploadId = response.upload_id;
+      Dispatcher.dispatch({
+        actionType: 'file-update',
+        state: 'uploaded',
+        uploadId: uploadId
+      });
+    };
 
-  _onChange: function(e) {
-    console.log(FileStore.getAll());
-    this.setState(FileStore.getAll());
+    this.xhr.upload.onprogress = (e) => {
+      this.setState({
+        progress: (e.lengthComputable ? (e.loaded / e.total) * 100 | 0 : 0)
+      });
+      Dispatcher.dispatch({
+        actionType: 'file-update',
+        state: 'uploading',
+      });
+    };
+
+    this.xhr.upload.onerror = (e) => {
+      this.setState(function(previousState, currentProps) {
+        return {retries: previousState.retry + 1};
+      });
+      Dispatcher.dispatch({
+        actionType: 'file-update',
+        state: 'retrying'
+      });
+    }
   },
 
   change: function(e) {
     var file = e.target.files[0];
-    //this.setState({file: file});
+
+    if (!file) {
+      return;
+    }
+
+    this.setState({
+      name: file.name,
+      progress: 0
+    });
 
     Dispatcher.dispatch({
       actionType: 'file-update',
@@ -61,44 +88,9 @@ module.exports = React.createClass({
     var data = new FormData();
     data.append('package', file);
 
-    var xhr = new XMLHttpRequest();
+    this.xhr.open('POST', this.props.uploadUrl, true);
 
-    xhr.open('POST', this.props.uploadUrl, true);
-
-    xhr.onload = function(e) {
-      // XXX handle bad response
-      var response = JSON.parse(e.target.responseText);
-      var uploadId = response.upload_id;
-      Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'uploaded',
-        uploadId: uploadId
-      });
-    };
-
-    xhr.upload.onprogress = function(e) {
-      Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'uploading',
-        progress: (e.lengthComputable ? (e.loaded / e.total) * 100 | 0 : 0)
-      });
-    }
-
-    xhr.upload.onerror = function() {
-      this.setState(function(previousState, currentProps) {
-        return {retry: previousState.retry + 1};
-      });
-      Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'retrying'
-      });
-    }
-
-    xhr.onreadystatechange = function() {
-      console.log(xhr.readyState)
-    }
-
-    xhr.send(data);
+    this.xhr.send(data);
   },
 
   handleClick: function(e) {
@@ -110,7 +102,7 @@ module.exports = React.createClass({
 
   render: function() {
     return (
-      <div onClick={ this.handleClick } style={{ backgroundColor: 'silver', height:20}}>
+      <div onClick={ this.handleClick } style={{ backgroundColor: 'silver'}}>
         <input
         type="file"
         ref="fileInput"
@@ -121,7 +113,6 @@ module.exports = React.createClass({
         />
         <div>{ this.state.name }</div>
         <div>{ this.state.progress }</div>
-        <div>{ this.state.state }</div>
       </div>
     )
   }
