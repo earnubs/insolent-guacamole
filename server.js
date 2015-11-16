@@ -11,7 +11,8 @@ app.get('/', function (req, res) {
 });
 
 app.post('/updown', upload.single('package'), function (req, res, next) {
-  res.set('Content-Type', 'text/html');
+  res.set('Content-Type', 'application/json');
+  res.json({ upload_id: 'iama-uploadid' })
   res.status(204).end();
 });
 

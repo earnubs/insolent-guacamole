@@ -65,10 +65,14 @@ module.exports = React.createClass({
 
     xhr.open('POST', this.props.uploadUrl, true);
 
-    xhr.onload = function() {
+    xhr.onload = function(e) {
+      // XXX handle bad response
+      var response = JSON.parse(e.target.responseText);
+      var uploadId = response.upload_id;
       Dispatcher.dispatch({
         actionType: 'file-update',
-        state: 'uploaded'
+        state: 'uploaded',
+        uploadId: uploadId
       });
     };
 

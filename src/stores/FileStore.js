@@ -23,7 +23,8 @@ var _file = {
   progress: null,
   name: null,
   size: null,
-  lastModifiedDate: null
+  lastModifiedDate: null,
+  uploadId: null
 };
 
 var FileStore = assign({}, EventEmitter.prototype, {
