@@ -1,8 +1,9 @@
 PATH  := node_modules/.bin:$(PATH)
 
-SOURCE = src/uploader.js
+SOURCE = src/app.js
 TARGET = public/js/bundle.js
 FLAGS = -t [ babelify --presets [ es2015 react ] ]
+UPLOADS = uploads/*
 
 all: build
 
@@ -18,4 +19,7 @@ server:
 test:
 	npm test
 
-.PHONY: build watch test server
+clean:
+	rm $(UPLOADS)
+
+.PHONY: build watch test server clean
