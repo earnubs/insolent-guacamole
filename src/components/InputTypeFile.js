@@ -21,6 +21,7 @@ module.exports = React.createClass({
   getInitialState: function() {
     return {
       // initial state: ?
+      name: null,
       progress: 0,
       retries: 0
     }

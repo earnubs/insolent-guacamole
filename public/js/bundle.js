@@ -20629,7 +20629,7 @@ process.umask = function() { return 0; };
 var React = require('react');
 var ReactDOM = require('react-dom');
 var Dispatcher = require('./dispatcher/AppDispatcher.js');
-var Uploader = React.createFactory(require('./components/uploader.js'));
+var Uploader = React.createFactory(require('./components/Uploader.js'));
 var FileStore = require('./stores/FileStore.js');
 
 ReactDOM.render(React.createElement(Uploader, {
@@ -20676,7 +20676,7 @@ ReactDOM.render(React.createElement(Uploader, {
  *
  */
 
-},{"./components/uploader.js":167,"./dispatcher/AppDispatcher.js":168,"./stores/FileStore.js":169,"react":162,"react-dom":6}],166:[function(require,module,exports){
+},{"./components/Uploader.js":167,"./dispatcher/AppDispatcher.js":168,"./stores/FileStore.js":169,"react":162,"react-dom":6}],166:[function(require,module,exports){
 'use strict';
 
 var React = require('react');
@@ -20702,6 +20702,7 @@ module.exports = React.createClass({
   getInitialState: function getInitialState() {
     return {
       // initial state: ?
+      name: null,
       progress: 0,
       retries: 0
     };

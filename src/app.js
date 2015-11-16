@@ -1,7 +1,7 @@
 var React = require('react')
 var ReactDOM = require('react-dom');
 var Dispatcher = require('./dispatcher/AppDispatcher.js');
-var Uploader = React.createFactory(require('./components/uploader.js'));
+var Uploader = React.createFactory(require('./components/Uploader.js'));
 var FileStore = require('./stores/FileStore.js');
 
 ReactDOM.render(
