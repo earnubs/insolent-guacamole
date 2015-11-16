@@ -1,7 +1,7 @@
 var React = require('react')
 var ReactDOM = require('react-dom');
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
-var Input = React.createFactory(require('./input-type-file.js'));
+var Input = React.createFactory(require('./InputTypeFile.js'));
 var FileStore = require('../stores/FileStore.js');
 
 function toggleSubmit() {

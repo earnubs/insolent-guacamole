@@ -20815,7 +20815,7 @@ module.exports = React.createClass({
 var React = require('react');
 var ReactDOM = require('react-dom');
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
-var Input = React.createFactory(require('./input-type-file.js'));
+var Input = React.createFactory(require('./InputTypeFile.js'));
 var FileStore = require('../stores/FileStore.js');
 
 function toggleSubmit() {
@@ -20875,7 +20875,7 @@ var Uploader = React.createClass({
 
 module.exports = Uploader;
 
-},{"../dispatcher/AppDispatcher.js":168,"../stores/FileStore.js":169,"./input-type-file.js":166,"react":162,"react-dom":6}],168:[function(require,module,exports){
+},{"../dispatcher/AppDispatcher.js":168,"../stores/FileStore.js":169,"./InputTypeFile.js":166,"react":162,"react-dom":6}],168:[function(require,module,exports){
 'use strict';
 
 var Dispatcher = require('flux').Dispatcher;
