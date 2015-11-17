@@ -1,6 +1,7 @@
 var React = require('react');
 require('es6-promise').polyfill();
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
+var UploadConstants = require('../constants/UploadConstants.js');
 
 module.exports = React.createClass({
 
@@ -35,8 +36,8 @@ module.exports = React.createClass({
       var response = JSON.parse(e.target.responseText);
       var uploadId = response.upload_id;
       Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'uploaded',
+        actionType: 'package-update',
+        state: UploadConstants.PACKAGE_UPLOADED,
         uploadId: uploadId
       });
     };
@@ -46,8 +47,8 @@ module.exports = React.createClass({
         progress: (e.lengthComputable ? (e.loaded / e.total) * 100 | 0 : 0)
       });
       Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'uploading',
+        actionType: 'package-update',
+        state: UploadConstants.PACKAGE_UPLOADING
       });
     };
 
@@ -56,8 +57,8 @@ module.exports = React.createClass({
         return {retries: previousState.retry + 1};
       });
       Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'retrying'
+        actionType: 'package-update',
+        state: UploadConstants.PACKAGE_RETRYING
       });
     }
   },
@@ -75,11 +76,10 @@ module.exports = React.createClass({
     });
 
     Dispatcher.dispatch({
-      actionType: 'file-update',
-      state: 'selected',
+      actionType: 'package-update',
+      state: UploadConstants.PACKAGE_SELECTED,
       name: file.name,
       size: file.size,
-      lastModified: file.lastModifiedDate
     });
 
     this.uploadFile(file);

@@ -1,33 +1,22 @@
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
 var EventEmitter = require('events').EventEmitter;
 var assign = require('object-assign');
-
-/** TODO
- * raname state to uploadState
- */
-
-const STATES = [
-  'selected',
-  'uploading',
-  'uploaded',
-  'retrying',
-  'failed',
-  'scanning',
-  'complete'
-];
+var UploadConstants = require('../constants/UploadConstants.js');
 
 const CHANGE_EVENT = 'change';
 
 var _file = {
   state: null,
-  progress: null,
   name: null,
   size: null,
-  lastModifiedDate: null,
   uploadId: null
 };
 
-var FileStore = assign({}, EventEmitter.prototype, {
+/**
+ * PackageStore - data on the the package being uploaded.
+ */
+
+var PackageStore = assign({}, EventEmitter.prototype, {
 
   get: function(key) {
     return _file[key];
@@ -46,30 +35,35 @@ var FileStore = assign({}, EventEmitter.prototype, {
   },
 
   dispatcherToken: Dispatcher.register(function(payload) {
-    var state;
+    var uploadState;
 
-    //console.log(payload);
-
-    if (payload.actionType === 'file-update') {
+    if (payload.actionType === 'package-update') {
 
       if (payload.state) {
-        state = STATES.indexOf(payload.state.trim());
-        if (state > -1) {
-          _file.state = STATES[state];
+        for (var prop in UploadConstants) {
+          if (UploadConstants[prop] === payload.state) {
+            _file.state = UploadConstants[prop];
+          }
+        }
+      /**
+        uploadState = UploadConstantsf(payload.state.trim());
+        if (uploadState > -1) {
+          _file.state = UploadConstants[uploadState];
         } else {
           console.log('Unknown upload state: ' + payload.state);
         }
+        **/
       }
-      if (payload.progress) {
-        _file.progress = payload.progress;
+      if (payload.size) {
+        _file.size = payload.size;
       }
       if (payload.name) {
         _file.name = payload.name;
       }
 
-      FileStore.emit(CHANGE_EVENT);
+      PackageStore.emit(CHANGE_EVENT);
     }
   })
 });
 
-module.exports = FileStore;
+module.exports = PackageStore;

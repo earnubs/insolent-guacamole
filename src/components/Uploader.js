@@ -2,53 +2,37 @@ var React = require('react')
 var ReactDOM = require('react-dom');
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
 var Input = React.createFactory(require('./InputTypeFile.js'));
-var FileStore = require('../stores/FileStore.js');
-
-function toggleSubmit() {
-  // activate or deactivate the submit button depending on state of form and upload
-}
-
-function checkFormValidity(form) {
-  var elements = form.elements;
-  var i;
-  var isValid = true;
-
-  for(i = elements.length; i--;) {
-    if (!elements[i].checkValidity()) {
-      isValid = false;
-      break;
-    }
-  }
-
-  return isValid;
-}
+var PackageStore = require('../stores/PackageStore.js');
+var FormStore = require('../stores/FormStore.js');
+var UploadConstants = require('../constants/UploadConstants.js');
 
 var Uploader = React.createClass({
 
   getInitialState: function() {
-    return FileStore.getAll();
+    return PackageStore.getAll();
   },
 
   componentDidMount: function() {
-    if (this.props.formSelector) {
-      var formEl = document.getElementById(this.props.formSelector);
-      formEl.addEventListener('change', function(e) {
-        console.log(checkFormValidity(e.currentTarget));
-        // action to update the FormStore
-      }, false);
-    }
-    FileStore.addChangeListener(this._onChange);
+    this.buttonEl = document.getElementById(this.props.submitButton);
+    PackageStore.addChangeListener(this._onChange);
   },
 
   componentWillUnmount: function() {
-    // XXX remove form listener
-    FileStore.removeChangeListener(this._onChange);
+    PackageStore.removeChangeListener(this._onChange);
+  },
+
+  disableFormSubmit: function(disable) {
+    return this.buttonEl.disabled = disable ? true : false;
   },
 
   _onChange: function() {
-    //console.log('xxx');
-    //console.log(FileStore.getAll());
-    this.setState(FileStore.getAll());
+    this.setState({
+      package: PackageStore.getAll()
+    });
+
+    this.disableFormSubmit(
+      (PackageStore.get('state') >= UploadConstants.PACKAGE_UPLOADED)
+    );
   },
 
   render: function() {

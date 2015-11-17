@@ -20628,11 +20628,10 @@ process.umask = function() { return 0; };
 
 var React = require('react');
 var ReactDOM = require('react-dom');
-var Dispatcher = require('./dispatcher/AppDispatcher.js');
 var Uploader = React.createFactory(require('./components/Uploader.js'));
-var FileStore = require('./stores/FileStore.js');
 
 ReactDOM.render(React.createElement(Uploader, {
+  submitButton: 'submit-form',
   uploadUrl: '/updown'
 }), document.getElementById('uploader'));
 
@@ -20676,12 +20675,13 @@ ReactDOM.render(React.createElement(Uploader, {
  *
  */
 
-},{"./components/Uploader.js":167,"./dispatcher/AppDispatcher.js":168,"./stores/FileStore.js":169,"react":162,"react-dom":6}],166:[function(require,module,exports){
+},{"./components/Uploader.js":167,"react":162,"react-dom":6}],166:[function(require,module,exports){
 'use strict';
 
 var React = require('react');
 require('es6-promise').polyfill();
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
+var UploadConstants = require('../constants/UploadConstants.js');
 
 module.exports = React.createClass({
 
@@ -20718,8 +20718,8 @@ module.exports = React.createClass({
       var response = JSON.parse(e.target.responseText);
       var uploadId = response.upload_id;
       Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'uploaded',
+        actionType: 'package-update',
+        state: UploadConstants.PACKAGE_UPLOADED,
         uploadId: uploadId
       });
     };
@@ -20729,8 +20729,8 @@ module.exports = React.createClass({
         progress: e.lengthComputable ? e.loaded / e.total * 100 | 0 : 0
       });
       Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'uploading'
+        actionType: 'package-update',
+        state: UploadConstants.PACKAGE_UPLOADING
       });
     };
 
@@ -20739,8 +20739,8 @@ module.exports = React.createClass({
         return { retries: previousState.retry + 1 };
       });
       Dispatcher.dispatch({
-        actionType: 'file-update',
-        state: 'retrying'
+        actionType: 'package-update',
+        state: UploadConstants.PACKAGE_RETRYING
       });
     };
   },
@@ -20758,11 +20758,10 @@ module.exports = React.createClass({
     });
 
     Dispatcher.dispatch({
-      actionType: 'file-update',
-      state: 'selected',
+      actionType: 'package-update',
+      state: UploadConstants.PACKAGE_SELECTED,
       name: file.name,
-      size: file.size,
-      lastModified: file.lastModifiedDate
+      size: file.size
     });
 
     this.uploadFile(file);
@@ -20810,60 +20809,42 @@ module.exports = React.createClass({
   }
 });
 
-},{"../dispatcher/AppDispatcher.js":168,"es6-promise":1,"react":162}],167:[function(require,module,exports){
+},{"../constants/UploadConstants.js":168,"../dispatcher/AppDispatcher.js":169,"es6-promise":1,"react":162}],167:[function(require,module,exports){
 'use strict';
 
 var React = require('react');
 var ReactDOM = require('react-dom');
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
 var Input = React.createFactory(require('./InputTypeFile.js'));
-var FileStore = require('../stores/FileStore.js');
-
-function toggleSubmit() {
-  // activate or deactivate the submit button depending on state of form and upload
-}
-
-function checkFormValidity(form) {
-  var elements = form.elements;
-  var i;
-  var isValid = true;
-
-  for (i = elements.length; i--;) {
-    if (!elements[i].checkValidity()) {
-      isValid = false;
-      break;
-    }
-  }
-
-  return isValid;
-}
+var PackageStore = require('../stores/PackageStore.js');
+var FormStore = require('../stores/FormStore.js');
+var UploadConstants = require('../constants/UploadConstants.js');
 
 var Uploader = React.createClass({
 
   getInitialState: function getInitialState() {
-    return FileStore.getAll();
+    return PackageStore.getAll();
   },
 
   componentDidMount: function componentDidMount() {
-    if (this.props.formSelector) {
-      var formEl = document.getElementById(this.props.formSelector);
-      formEl.addEventListener('change', function (e) {
-        console.log(checkFormValidity(e.currentTarget));
-        // action to update the FormStore
-      }, false);
-    }
-    FileStore.addChangeListener(this._onChange);
+    this.buttonEl = document.getElementById(this.props.submitButton);
+    PackageStore.addChangeListener(this._onChange);
   },
 
   componentWillUnmount: function componentWillUnmount() {
-    // XXX remove form listener
-    FileStore.removeChangeListener(this._onChange);
+    PackageStore.removeChangeListener(this._onChange);
+  },
+
+  disableFormSubmit: function disableFormSubmit(disable) {
+    return this.buttonEl.disabled = disable ? true : false;
   },
 
   _onChange: function _onChange() {
-    //console.log('xxx');
-    //console.log(FileStore.getAll());
-    this.setState(FileStore.getAll());
+    this.setState({
+      package: PackageStore.getAll()
+    });
+
+    this.disableFormSubmit(PackageStore.get('state') >= UploadConstants.PACKAGE_UPLOADED);
   },
 
   render: function render() {
@@ -20876,38 +20857,87 @@ var Uploader = React.createClass({
 
 module.exports = Uploader;
 
-},{"../dispatcher/AppDispatcher.js":168,"../stores/FileStore.js":169,"./InputTypeFile.js":166,"react":162,"react-dom":6}],168:[function(require,module,exports){
+},{"../constants/UploadConstants.js":168,"../dispatcher/AppDispatcher.js":169,"../stores/FormStore.js":170,"../stores/PackageStore.js":171,"./InputTypeFile.js":166,"react":162,"react-dom":6}],168:[function(require,module,exports){
+'use strict';
+
+module.exports = {
+  'PACKAGE_SELECTED': 1,
+  'PACKAGE_UPLOADING': 2,
+  'PACKAGE_RETRYING': 3,
+  'PACKAGE_FAILED': 4,
+  'PACKAGE_UPLOADED': 5,
+  'PACKAGE_SCANNING': 6,
+  'PACKAGE_COMPLETE': 7
+};
+
+},{}],169:[function(require,module,exports){
 'use strict';
 
 var Dispatcher = require('flux').Dispatcher;
 
 module.exports = new Dispatcher();
 
-},{"flux":2}],169:[function(require,module,exports){
+},{"flux":2}],170:[function(require,module,exports){
 'use strict';
 
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
 var EventEmitter = require('events').EventEmitter;
 var assign = require('object-assign');
 
-/** TODO
- * raname state to uploadState
- */
+var CHANGE_EVENT = 'change';
 
-var STATES = ['selected', 'uploading', 'uploaded', 'retrying', 'failed', 'scanning', 'complete'];
+var _form = {
+  valid: false
+};
+
+var FormStore = assign({}, EventEmitter.prototype, {
+  isValid: function isValid() {
+    return _form.valid;
+  },
+
+  addChangeListener: function addChangeListener(callback) {
+    this.on(CHANGE_EVENT, callback);
+  },
+
+  removeChangeListener: function removeChangeListener(callback) {
+    this.removeListener(CHANGE_EVENT, callback);
+  },
+
+  dispatcherToken: Dispatcher.register(function (payload) {
+
+    if (payload.actionType === 'form-update') {
+      if (payload && typeof payload.validity === 'boolean') {
+        _form.valid = payload.validity;
+      }
+    }
+    FormStore.emit(CHANGE_EVENT);
+  })
+});
+
+module.exports = FormStore;
+
+},{"../dispatcher/AppDispatcher.js":169,"events":163,"object-assign":5}],171:[function(require,module,exports){
+'use strict';
+
+var Dispatcher = require('../dispatcher/AppDispatcher.js');
+var EventEmitter = require('events').EventEmitter;
+var assign = require('object-assign');
+var UploadConstants = require('../constants/UploadConstants.js');
 
 var CHANGE_EVENT = 'change';
 
 var _file = {
   state: null,
-  progress: null,
   name: null,
   size: null,
-  lastModifiedDate: null,
   uploadId: null
 };
 
-var FileStore = assign({}, EventEmitter.prototype, {
+/**
+ * PackageStore - data on the the package being uploaded.
+ */
+
+var PackageStore = assign({}, EventEmitter.prototype, {
 
   get: function get(key) {
     return _file[key];
@@ -20926,32 +20956,37 @@ var FileStore = assign({}, EventEmitter.prototype, {
   },
 
   dispatcherToken: Dispatcher.register(function (payload) {
-    var state;
+    var uploadState;
 
-    //console.log(payload);
-
-    if (payload.actionType === 'file-update') {
+    if (payload.actionType === 'package-update') {
 
       if (payload.state) {
-        state = STATES.indexOf(payload.state.trim());
-        if (state > -1) {
-          _file.state = STATES[state];
-        } else {
-          console.log('Unknown upload state: ' + payload.state);
+        for (var prop in UploadConstants) {
+          if (UploadConstants[prop] === payload.state) {
+            _file.state = UploadConstants[prop];
+          }
         }
+        /**
+          uploadState = UploadConstantsf(payload.state.trim());
+          if (uploadState > -1) {
+            _file.state = UploadConstants[uploadState];
+          } else {
+            console.log('Unknown upload state: ' + payload.state);
+          }
+          **/
       }
-      if (payload.progress) {
-        _file.progress = payload.progress;
+      if (payload.size) {
+        _file.size = payload.size;
       }
       if (payload.name) {
         _file.name = payload.name;
       }
 
-      FileStore.emit(CHANGE_EVENT);
+      PackageStore.emit(CHANGE_EVENT);
     }
   })
 });
 
-module.exports = FileStore;
+module.exports = PackageStore;
 
-},{"../dispatcher/AppDispatcher.js":168,"events":163,"object-assign":5}]},{},[165]);
+},{"../constants/UploadConstants.js":168,"../dispatcher/AppDispatcher.js":169,"events":163,"object-assign":5}]},{},[165]);
