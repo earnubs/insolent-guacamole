@@ -6,6 +6,7 @@ ReactDOM.render(
   <Uploader
     submitButton='submit-form'
     uploadUrl='/updown'
+    packageForm='form-files'
   />,
   document.getElementById('uploader')
 );

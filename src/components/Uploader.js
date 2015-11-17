@@ -22,7 +22,7 @@ var Uploader = React.createClass({
   },
 
   disableFormSubmit: function(disable) {
-    return this.buttonEl.disabled = disable ? true : false;
+    this.buttonEl.disabled = disable;
   },
 
   _onChange: function() {
@@ -31,7 +31,7 @@ var Uploader = React.createClass({
     });
 
     this.disableFormSubmit(
-      (PackageStore.get('state') >= UploadConstants.PACKAGE_UPLOADED)
+      !(PackageStore.get('state') >= UploadConstants.PACKAGE_UPLOADED)
     );
   },
 
@@ -39,6 +39,7 @@ var Uploader = React.createClass({
     return (
       <Input
       uploadUrl={this.props.uploadUrl}
+      packageForm={this.props.packageForm}
       />
     )
   }

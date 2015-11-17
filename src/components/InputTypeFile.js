@@ -29,6 +29,15 @@ module.exports = React.createClass({
   },
 
   componentDidMount: function() {
+
+    var form = document.getElementById(this.props.packageForm);
+
+    this.setState({
+      uploadId: form.elements.upload_id.value,
+      timestamp: form.elements.timestamp.value,
+      signature: form.elements.signature.value
+    });
+
     this.xhr = new XMLHttpRequest();
 
     this.xhr.onload = (e) => {
@@ -88,6 +97,9 @@ module.exports = React.createClass({
   uploadFile: function(file) {
     var data = new FormData();
     data.append('package', file);
+    data.append('upload_id', this.state.uploadId);
+    data.append('timestamp', this.state.timestamp);
+    data.append('signature', this.state.sgnature);
 
     this.xhr.open('POST', this.props.uploadUrl, true);
 

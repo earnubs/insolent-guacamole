@@ -20632,7 +20632,8 @@ var Uploader = React.createFactory(require('./components/Uploader.js'));
 
 ReactDOM.render(React.createElement(Uploader, {
   submitButton: 'submit-form',
-  uploadUrl: '/updown'
+  uploadUrl: '/updown',
+  packageForm: 'form-files'
 }), document.getElementById('uploader'));
 
 /**
@@ -20711,6 +20712,14 @@ module.exports = React.createClass({
   componentDidMount: function componentDidMount() {
     var _this = this;
 
+    var form = document.getElementById(this.props.packageForm);
+
+    this.setState({
+      uploadId: form.elements.upload_id.value,
+      timestamp: form.elements.timestamp.value,
+      signature: form.elements.signature.value
+    });
+
     this.xhr = new XMLHttpRequest();
 
     this.xhr.onload = function (e) {
@@ -20770,6 +20779,9 @@ module.exports = React.createClass({
   uploadFile: function uploadFile(file) {
     var data = new FormData();
     data.append('package', file);
+    data.append('upload_id', this.state.uploadId);
+    data.append('timestamp', this.state.timestamp);
+    data.append('signature', this.state.sgnature);
 
     this.xhr.open('POST', this.props.uploadUrl, true);
 
@@ -20836,7 +20848,7 @@ var Uploader = React.createClass({
   },
 
   disableFormSubmit: function disableFormSubmit(disable) {
-    return this.buttonEl.disabled = disable ? true : false;
+    this.buttonEl.disabled = disable;
   },
 
   _onChange: function _onChange() {
@@ -20844,12 +20856,13 @@ var Uploader = React.createClass({
       package: PackageStore.getAll()
     });
 
-    this.disableFormSubmit(PackageStore.get('state') >= UploadConstants.PACKAGE_UPLOADED);
+    this.disableFormSubmit(!(PackageStore.get('state') >= UploadConstants.PACKAGE_UPLOADED));
   },
 
   render: function render() {
     return React.createElement(Input, {
-      uploadUrl: this.props.uploadUrl
+      uploadUrl: this.props.uploadUrl,
+      packageForm: this.props.packageForm
     });
   }
 
