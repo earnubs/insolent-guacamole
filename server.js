@@ -10,10 +10,28 @@ app.get('/', function (req, res) {
   res.sendFile(path.join(__dirname + '/index.html'));
 });
 
-app.post('/updown', upload.single('package'), function (req, res, next) {
+// in reality this is a CORS request with an additional OPTIONS preflight req
+app.post('/unscanned-upload', upload.single('package'), function (req, res, next) {
   res.set('Content-Type', 'application/json');
   res.json({ upload_id: 'iama-uploadid' })
-  res.status(204).end();
+});
+
+// form upload
+app.post('/upload', function (req, res, next) {
+  res.set('Content-Type', 'application/json');
+  //res.status(500).json({ error: 'message' })
+  res.json({
+    success: true,
+    status_url: '/click-scan-complete/updown/myid'
+  })
+});
+
+// package scan polling
+app.post('/click-scan-complete/updown/myid', function (req, res, next) {
+  res.set('Content-Type', 'application/json');
+  res.json({
+    //
+  })
 });
 
 app.listen(3000);

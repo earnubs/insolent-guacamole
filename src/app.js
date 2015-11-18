@@ -1,14 +1,25 @@
 var React = require('react')
 var ReactDOM = require('react-dom');
 var Uploader = React.createFactory(require('./components/Uploader.js'));
+var Submit = React.createFactory(require('./components/InputTypeSubmit.js'));
+
+require('./form.js'); // ideally form would be a component too
 
 ReactDOM.render(
   <Uploader
     submitButton='submit-form'
-    uploadUrl='/updown'
+    uploadUrl='/unscanned-upload' // package upload url
+    formUrl='' // form post url
+    scanUrl='' // package scan api url
     packageForm='form-files'
   />,
   document.getElementById('uploader')
+);
+
+ReactDOM.render(
+  <Submit
+  />,
+  document.getElementById('submit-form')
 );
 
 /**

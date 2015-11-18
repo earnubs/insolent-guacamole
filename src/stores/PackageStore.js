@@ -45,20 +45,15 @@ var PackageStore = assign({}, EventEmitter.prototype, {
             _file.state = UploadConstants[prop];
           }
         }
-      /**
-        uploadState = UploadConstantsf(payload.state.trim());
-        if (uploadState > -1) {
-          _file.state = UploadConstants[uploadState];
-        } else {
-          console.log('Unknown upload state: ' + payload.state);
-        }
-        **/
       }
       if (payload.size) {
         _file.size = payload.size;
       }
       if (payload.name) {
         _file.name = payload.name;
+      }
+      if (payload.statusUrl) {
+        _file.statusUrl = payload.statusUrl;
       }
 
       PackageStore.emit(CHANGE_EVENT);
