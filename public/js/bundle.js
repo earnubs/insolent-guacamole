@@ -30093,6 +30093,7 @@ module.exports = React.createClass({
 },{"../constants/UploadConstants.js":170,"../dispatcher/AppDispatcher.js":171,"../stores/PackageStore.js":173,"es6-promise":1,"react":163}],169:[function(require,module,exports){
 'use strict';
 
+var $ = require('jquery');
 var React = require('react');
 var ReactDOM = require('react-dom');
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
@@ -30115,8 +30116,27 @@ var Uploader = React.createClass({
   },
 
   _onChange: function _onChange() {
+    var pkg = PackageStore.getAll();
     this.setState({
-      package: PackageStore.getAll()
+      package: pkg
+    });
+
+    if (pkg.state === UploadConstants.PACKAGE_SCANNING) {
+      console.log('start scanning!');
+      console.log(pkg.statusUrl);
+      this.packageScan(pkg.statusUrl);
+    }
+  },
+
+  packageScan: function packageScan(url) {
+    $.get(url).done(function (data) {
+      console.log('scanning...');
+      console.log(data);
+    }).fail(function (err) {
+      console.log('fail');
+      console.log(err);
+    }).always(function () {
+      console.log('always');
     });
   },
 
@@ -30133,7 +30153,7 @@ var Uploader = React.createClass({
 
 module.exports = Uploader;
 
-},{"../constants/UploadConstants.js":170,"../dispatcher/AppDispatcher.js":171,"../stores/PackageStore.js":173,"./InputTypeFile.js":167,"react":163,"react-dom":7}],170:[function(require,module,exports){
+},{"../constants/UploadConstants.js":170,"../dispatcher/AppDispatcher.js":171,"../stores/PackageStore.js":173,"./InputTypeFile.js":167,"jquery":5,"react":163,"react-dom":7}],170:[function(require,module,exports){
 'use strict';
 
 module.exports = {

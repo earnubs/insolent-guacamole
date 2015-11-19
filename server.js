@@ -27,10 +27,10 @@ app.post('/upload', function (req, res, next) {
 });
 
 // package scan polling
-app.post('/click-scan-complete/updown/myid', function (req, res, next) {
+app.get('/click-scan-complete/updown/myid', function (req, res, next) {
   res.set('Content-Type', 'application/json');
   res.json({
-    //
+    success: true
   })
 });
 
