@@ -26,6 +26,16 @@ app.post('/upload', function (req, res, next) {
   })
 });
 
+// upload signature
+app.get('/dev/click-apps/upload-signature/', function (req, res, next) {
+  res.set('Content-Type', 'application/json');
+  res.json({
+    timestamp: "1447966986.76",
+    upload_id: "fac249cf-2965-4f39-8786-2d872da55614",
+    signature: "0cdca618c6aa79cb264057e6f66eb300ffcb66fcf395aecf41e031282df41573"
+  })
+});
+
 // package scan polling
 app.get('/click-scan-complete/updown/myid', function (req, res, next) {
   res.set('Content-Type', 'application/json');

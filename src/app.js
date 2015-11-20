@@ -8,7 +8,7 @@ require('./form.js'); // ideally form would be a component too
 ReactDOM.render(
   <Uploader
     submitButton='submit-form'
-    uploadUrl='/unscanned-upload' // package upload url
+    packageUploadUrl='/unscanned-upload' // package upload url
     formUrl='' // form post url
     scanUrl='' // package scan api url
     packageForm='form-files'

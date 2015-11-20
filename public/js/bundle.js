@@ -29838,6 +29838,34 @@ process.umask = function() { return 0; };
 },{}],166:[function(require,module,exports){
 'use strict';
 
+var AppDispatcher = require('../dispatcher/AppDispatcher.js');
+var UploadConstants = require('../constants/UploadConstants.js');
+
+module.exports = {
+  setUploadStatus: function setUploadStatus(status) {
+    AppDispatcher.dispatch({
+      actionType: UploadConstants.PACKAGE_UPDATE_STATUS,
+      status: status
+    });
+  },
+  packageScan: function packageScan(url) {
+    AppDispatcher.dispatch({
+      actionType: UploadConstants.PACKAGE_SCAN,
+      url: url
+    });
+  },
+  startUpload: function startUpload(url, data) {
+    AppDispatcher.dispatch({
+      actionType: UploadConstants.PACKAGE_START_UPLOAD,
+      url: url,
+      formData: data
+    });
+  }
+};
+
+},{"../constants/UploadConstants.js":173,"../dispatcher/AppDispatcher.js":174}],167:[function(require,module,exports){
+'use strict';
+
 var React = require('react');
 var ReactDOM = require('react-dom');
 var Uploader = React.createFactory(require('./components/Uploader.js'));
@@ -29847,7 +29875,7 @@ require('./form.js'); // ideally form would be a component too
 
 ReactDOM.render(React.createElement(Uploader, {
   submitButton: 'submit-form',
-  uploadUrl: '/unscanned-upload' // package upload url
+  packageUploadUrl: '/unscanned-upload' // package upload url
   , formUrl: '' // form post url
   , scanUrl: '' // package scan api url
   , packageForm: 'form-files'
@@ -29895,12 +29923,13 @@ ReactDOM.render(React.createElement(Submit, null), document.getElementById('subm
  *
  */
 
-},{"./components/InputTypeSubmit.js":168,"./components/Uploader.js":169,"./form.js":172,"react":163,"react-dom":7}],167:[function(require,module,exports){
+},{"./components/InputTypeSubmit.js":169,"./components/Uploader.js":171,"./form.js":175,"react":163,"react-dom":7}],168:[function(require,module,exports){
 'use strict';
 
-var React = require('react');
 require('es6-promise').polyfill();
-var Dispatcher = require('../dispatcher/AppDispatcher.js');
+var $ = require('jquery');
+var React = require('react');
+var Actions = require('../actions/UploaderActions.js');
 var UploadConstants = require('../constants/UploadConstants.js');
 
 module.exports = React.createClass({
@@ -29915,96 +29944,48 @@ module.exports = React.createClass({
     return {
       multiple: false,
       accept: '.snap, .click',
-      maxRetries: 1 // retry after error, then fail
+      maxRetries: 1, // retry after error, then fail
+      progress: 0
     };
   },
 
   getInitialState: function getInitialState() {
     return {
-      // initial state: ?
-      name: null,
-      progress: 0,
-      retries: 0
+      fileName: null,
+      uploadProgress: 0
     };
   },
 
   componentDidMount: function componentDidMount() {
-    var _this = this;
+    var form;
+    var data = new FormData();
+    if (this.props.packageForm && this.props.uploadFields.length) {
+      form = document.getElementById(this.props.packageForm);
 
-    var form = document.getElementById(this.props.packageForm);
-
-    this.setState({
-      uploadId: form.elements.upload_id.value,
-      timestamp: form.elements.timestamp.value,
-      signature: form.elements.signature.value
-    });
-
-    this.xhr = new XMLHttpRequest();
-
-    this.xhr.onload = function (e) {
-      // XXX handle bad response
-      var response = JSON.parse(e.target.responseText);
-      var uploadId = response.upload_id;
-      Dispatcher.dispatch({
-        actionType: 'package-update',
-        state: UploadConstants.PACKAGE_UPLOADED,
-        uploadId: uploadId
+      this.props.uploadFields.forEach(function (item) {
+        data.append(item, form.elements[item].value);
       });
-    };
+    }
 
-    this.xhr.upload.onprogress = function (e) {
-      _this.setState({
-        progress: e.lengthComputable ? e.loaded / e.total * 100 | 0 : 0
-      });
-      Dispatcher.dispatch({
-        actionType: 'package-update',
-        state: UploadConstants.PACKAGE_UPLOADING
-      });
-    };
-
-    this.xhr.upload.onerror = function (e) {
-      _this.setState(function (previousState, currentProps) {
-        return { retries: previousState.retry + 1 };
-      });
-      Dispatcher.dispatch({
-        actionType: 'package-update',
-        state: UploadConstants.PACKAGE_RETRYING
-      });
-    };
+    this.setState({ 'uploadData': data });
   },
 
-  change: function change(e) {
+  handleChange: function handleChange(e) {
     var file = e.target.files[0];
+    var data = this.state.uploadData;
+
+    data.append('package', file);
 
     if (!file) {
+      // XXX error
       return;
     }
 
     this.setState({
-      name: file.name,
-      progress: 0
+      fileName: file.name
     });
 
-    Dispatcher.dispatch({
-      actionType: 'package-update',
-      state: UploadConstants.PACKAGE_SELECTED,
-      name: file.name,
-      size: file.size
-    });
-
-    this.uploadFile(file);
-  },
-
-  uploadFile: function uploadFile(file) {
-    var data = new FormData();
-    data.append('package', file);
-    data.append('upload_id', this.state.uploadId);
-    data.append('timestamp', this.state.timestamp);
-    data.append('signature', this.state.sgnature);
-
-    this.xhr.open('POST', this.props.uploadUrl, true);
-
-    this.xhr.send(data);
+    Actions.startUpload(this.props.uploadUrl, data);
   },
 
   handleClick: function handleClick(e) {
@@ -30017,30 +29998,33 @@ module.exports = React.createClass({
   render: function render() {
     return React.createElement(
       'div',
-      { onClick: this.handleClick, style: { backgroundColor: 'silver' } },
+      {
+        onClick: this.handleClick,
+        style: { backgroundColor: 'silver' }
+      },
       React.createElement('input', {
         type: 'file',
         ref: 'fileInput',
         multiple: this.props.multiple,
         accept: this.props.accept,
-        onChange: this.change,
+        onChange: this.handleChange,
         style: { display: 'none' }
       }),
       React.createElement(
         'div',
         null,
-        this.state.name
+        this.state.fileName
       ),
       React.createElement(
         'div',
         null,
-        this.state.progress
+        this.state.uploadProgress
       )
     );
   }
 });
 
-},{"../constants/UploadConstants.js":170,"../dispatcher/AppDispatcher.js":171,"es6-promise":1,"react":163}],168:[function(require,module,exports){
+},{"../actions/UploaderActions.js":166,"../constants/UploadConstants.js":173,"es6-promise":1,"jquery":5,"react":163}],169:[function(require,module,exports){
 'use strict';
 
 var React = require('react');
@@ -30072,9 +30056,7 @@ module.exports = React.createClass({
   },
 
   _onChange: function _onChange() {
-    // enable the submit button if the upload state is uploaded or better
-    // this would be more React like as a component
-    this.setState({ disabled: PackageStore.get('state') < UploadConstants.PACKAGE_UPLOADED
+    this.setState({ disabled: PackageStore.get('packageUpload.state') < UploadConstants.PACKAGE_UPLOADED
     });
   },
 
@@ -30090,95 +30072,132 @@ module.exports = React.createClass({
   }
 });
 
-},{"../constants/UploadConstants.js":170,"../dispatcher/AppDispatcher.js":171,"../stores/PackageStore.js":173,"es6-promise":1,"react":163}],169:[function(require,module,exports){
+},{"../constants/UploadConstants.js":173,"../dispatcher/AppDispatcher.js":174,"../stores/PackageStore.js":176,"es6-promise":1,"react":163}],170:[function(require,module,exports){
+'use strict';
+
+require('es6-promise').polyfill();
+var React = require('react');
+var Dispatcher = require('../dispatcher/AppDispatcher.js');
+var UploadConstants = require('../constants/UploadConstants.js');
+
+module.exports = React.createClass({
+  render: function render() {
+    return React.createElement(
+      'div',
+      null,
+      this.props.message
+    );
+  }
+});
+
+},{"../constants/UploadConstants.js":173,"../dispatcher/AppDispatcher.js":174,"es6-promise":1,"react":163}],171:[function(require,module,exports){
 'use strict';
 
 var $ = require('jquery');
 var React = require('react');
 var ReactDOM = require('react-dom');
-var Dispatcher = require('../dispatcher/AppDispatcher.js');
 var Input = React.createFactory(require('./InputTypeFile.js'));
+var Message = React.createFactory(require('./Message.js'));
 var PackageStore = require('../stores/PackageStore.js');
 var UploadConstants = require('../constants/UploadConstants.js');
+var StringConstants = require('../constants/StringConstants.js');
+
+function getUploaderState() {
+  return {
+    // assertion: AssertionStore.get(),
+    packageUpload: PackageStore.getAll(),
+    message: StringConstants.SELECT_PACKAGE // messageStore
+  };
+};
 
 var Uploader = React.createClass({
 
   getInitialState: function getInitialState() {
-    return PackageStore.getAll();
+    return getUploaderState();
   },
 
   componentDidMount: function componentDidMount() {
-    PackageStore.addChangeListener(this._onChange);
+    PackageStore.addChangeListener(this.handlePackageStoreChange);
   },
 
   componentWillUnmount: function componentWillUnmount() {
-    PackageStore.removeChangeListener(this._onChange);
+    PackageStore.removeChangeListener(this.handlePackageStoreChange);
   },
 
-  _onChange: function _onChange() {
-    var pkg = PackageStore.getAll();
-    this.setState({
-      package: pkg
-    });
-
-    if (pkg.state === UploadConstants.PACKAGE_SCANNING) {
-      console.log('start scanning!');
-      console.log(pkg.statusUrl);
-      this.packageScan(pkg.statusUrl);
-    }
-  },
-
-  packageScan: function packageScan(url) {
-    $.get(url).done(function (data) {
-      console.log('scanning...');
-      console.log(data);
-    }).fail(function (err) {
-      console.log('fail');
-      console.log(err);
-    }).always(function () {
-      console.log('always');
-    });
-  },
+  handlePackageStoreChange: function handlePackageStoreChange() {},
 
   render: function render() {
-    return React.createElement(Input, {
-      stateValue: this.state.state,
-      uploadUrl: this.props.uploadUrl,
-      statusUrl: this.state.statusUrl,
-      packageForm: this.props.packageForm // XXX packageFormID
-    });
+    return React.createElement(
+      'div',
+      null,
+      React.createElement(Input, {
+        uploadFields: ['upload_id', 'timestamp', 'signature'],
+        packageForm: this.props.packageForm,
+        uploadUrl: this.props.packageUploadUrl,
+        uploadData: this.state.packageUploadData
+      }),
+      React.createElement(Message, {
+        message: this.state.message
+      })
+    );
   }
 
 });
 
 module.exports = Uploader;
 
-},{"../constants/UploadConstants.js":170,"../dispatcher/AppDispatcher.js":171,"../stores/PackageStore.js":173,"./InputTypeFile.js":167,"jquery":5,"react":163,"react-dom":7}],170:[function(require,module,exports){
+},{"../constants/StringConstants.js":172,"../constants/UploadConstants.js":173,"../stores/PackageStore.js":176,"./InputTypeFile.js":168,"./Message.js":170,"jquery":5,"react":163,"react-dom":7}],172:[function(require,module,exports){
+'use strict';
+
+// TODO
+// window.FOO = {% trans 'Foo' %}
+
+module.exports = {
+  // EXTRA_INFO: 'Please include the following information when reporting this issue:',
+  // FILE_DETECTED: 'File detected, drop it here!',
+  // NO_FILE_SELECTED: 'No file selected for upload.',
+  // DRAG_DROP_FILE: 'Drag and drop a file here',
+  // TOTAL_UPLOADED: 'Total uploaded:',
+  SELECT_PACKAGE: 'Select a package to upload.',
+  PACKAGE_UPLOADING: 'Package uploading.',
+  PACKAGE_UPLOADED: 'Upload completed. Complete the form and submit.',
+  PACKAGE_SCANNING: 'Waiting for package scan to complete...',
+  E_UPLOAD_FAILED: 'The submitted files could not be uploaded, please try again.',
+  E_SUBMIT_FAILED: 'There was an unrecoverable error while submitting the request. Please resubmit your application.',
+  E_SCAN_FAILED: 'There was an unrecoverable error during the scan process. Please resubmit your application.',
+  E_FORM_INVALID: 'Please correct the fields indicated below before moving forward.'
+};
+
+},{}],173:[function(require,module,exports){
 'use strict';
 
 module.exports = {
-  'PACKAGE_SELECTED': 1,
-  'PACKAGE_UPLOADING': 2,
-  'PACKAGE_RETRYING': 3,
-  'PACKAGE_FAILED': 4,
-  'PACKAGE_UPLOADED': 5,
-  'PACKAGE_SCANNING': 6,
-  'PACKAGE_COMPLETE': 7
+  UPLOAD_SELECTED: 100,
+  UPLOAD_UPLOADING: 200,
+  UPLOAD_RETRYING: 300,
+  UPLOAD_FAILED: 400,
+  UPLOAD_UPLOADED: 500,
+  UPLOAD_SCANNING: 600,
+  UPLOAD_COMPLETE: 700,
+
+  PACKAGE_UPDATE_STATUS: 'package_update_status',
+  PACKAGE_SCAN: 'package_scan',
+  PACKAGE_START_UPLOAD: 'package_start_upload'
 };
 
-},{}],171:[function(require,module,exports){
+},{}],174:[function(require,module,exports){
 'use strict';
 
 var Dispatcher = require('flux').Dispatcher;
 
 module.exports = new Dispatcher();
 
-},{"flux":2}],172:[function(require,module,exports){
+},{"flux":2}],175:[function(require,module,exports){
 'use strict';
 
 var $ = require('jquery');
 require('es6-promise').polyfill();
-var Dispatcher = require('./dispatcher/AppDispatcher.js');
+var Actions = require('./actions/UploaderActions.js');
 var UploadConstants = require('./constants/UploadConstants.js');
 
 module.exports = (function () {
@@ -30191,12 +30210,7 @@ module.exports = (function () {
     e.preventDefault();
     $.post('/upload', $(this).serialize()).done(function (data) {
       //  can start polling scan results...
-      console.log(data);
-      Dispatcher.dispatch({
-        actionType: 'package-update',
-        state: UploadConstants.PACKAGE_SCANNING,
-        statusUrl: data.status_url
-      });
+      Actions.packageScan(data.status_url);
     }).fail(function (data) {
       // show error
       console.log('fail');
@@ -30205,9 +30219,10 @@ module.exports = (function () {
   };
 })();
 
-},{"./constants/UploadConstants.js":170,"./dispatcher/AppDispatcher.js":171,"es6-promise":1,"jquery":5}],173:[function(require,module,exports){
+},{"./actions/UploaderActions.js":166,"./constants/UploadConstants.js":173,"es6-promise":1,"jquery":5}],176:[function(require,module,exports){
 'use strict';
 
+var $ = require('jquery');
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
 var EventEmitter = require('events').EventEmitter;
 var assign = require('object-assign');
@@ -30216,10 +30231,69 @@ var UploadConstants = require('../constants/UploadConstants.js');
 var CHANGE_EVENT = 'change';
 
 var _file = {
-  state: null,
-  name: null,
-  size: null,
-  uploadId: null
+  status: null,
+  progress: 0,
+  retries: 0
+};
+
+var upload = function upload(url, data) {
+  $.ajax(url, {
+    type: 'POST',
+    data: data,
+    processData: false,
+    xhr: (function () {
+      var req = new XMLHttpRequest();
+      req.upload.onprogress = handleUploadProgress;
+      return req;
+    }).bind(this)
+  }).done(handleUploadDone).fail(handleUploadFail).always(handleUploadAlways);
+};
+
+var handleUploadProgress = function handleUploadProgress(e) {
+  _file.progress = e.lengthComputable ? e.loaded / e.total * 100 | 0 : 0;
+  _file.status = UploadConstants.UPLOAD_UPLOADING;
+};
+
+var handleUploadDone = function handleUploadDone(data, textStatus, jqXHR) {
+  if (textStatus === 'success') {
+    if (data && data.upload_id) {
+      //Actions.setUploadStatus(UploadConstants.UPLOAD_UPLOADED);
+      _file.status = UploadConstants.UPLOAD_UPLOADED;
+    }
+  } else {
+    // retry
+    // check MAX_RETRIES ...
+  }
+};
+
+var handleUploadFail = function handleUploadFail(jqXHR, textStatus, errorThrown) {
+  _file.retries += 1;
+  _file.status = UploadConstants.UPLOAD_RETRYING;
+};
+
+var handleUploadAlways = function handleUploadAlways() {
+  PackageStore.emit(CHANGE_EVENT);
+};
+
+var scan = function scan(url) {
+  $.ajax(url).done(handleScanResultsDone).fail(handleScanResultsFail);
+};
+
+var handleScanResultsDone = function handleScanResultsDone(data) {
+  // TODO polling, timeout
+  console.log('scanning...');
+  // XXX handle failure too
+  if (data && data.success) {
+    _file.status = UploadConstants.UPLOAD_COMPLETE;
+    PackageStore.emit(CHANGE_EVENT);
+  }
+};
+
+var handleScanResultsFail = function handleScanResultsFail(error) {
+  console.log('fail');
+  console.log(error);
+  _file.status = UploadConstants.UPLOAD_FAILED;
+  PackageStore.emit(CHANGE_EVENT);
 };
 
 /**
@@ -30245,32 +30319,32 @@ var PackageStore = assign({}, EventEmitter.prototype, {
   },
 
   dispatcherToken: Dispatcher.register(function (payload) {
-    var uploadState;
 
-    if (payload.actionType === 'package-update') {
+    switch (payload.actionType) {
+      case UploadConstants.PACKAGE_UPDATE_STATUS:
+        console.log(payload.status);
+        _file.status = payload.status;
+        PackageStore.emit(CHANGE_EVENT);
+        break;
 
-      if (payload.state) {
-        for (var prop in UploadConstants) {
-          if (UploadConstants[prop] === payload.state) {
-            _file.state = UploadConstants[prop];
-          }
-        }
-      }
-      if (payload.size) {
-        _file.size = payload.size;
-      }
-      if (payload.name) {
-        _file.name = payload.name;
-      }
-      if (payload.statusUrl) {
-        _file.statusUrl = payload.statusUrl;
-      }
+      case UploadConstants.PACKAGE_START_UPLOAD:
+        // XXX don't use bar url prop in case of fall through!
+        upload(payload.url, payload.formData);
+        _file.status = UploadConstants.UPLOAD_SELECTED;
+        PackageStore.emit(CHANGE_EVENT);
+        break;
 
-      PackageStore.emit(CHANGE_EVENT);
+      case UploadConstants.PACKAGE_SCAN:
+        scan(payload.url);
+        _file.status = UploadConstants.UPLOAD_SCANNING;
+        PackageStore.emit(CHANGE_EVENT);
+        break;
     }
+
+    return true;
   })
 });
 
 module.exports = PackageStore;
 
-},{"../constants/UploadConstants.js":170,"../dispatcher/AppDispatcher.js":171,"events":164,"object-assign":6}]},{},[166]);
+},{"../constants/UploadConstants.js":173,"../dispatcher/AppDispatcher.js":174,"events":164,"jquery":5,"object-assign":6}]},{},[167]);

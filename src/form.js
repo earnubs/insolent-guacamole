@@ -1,6 +1,6 @@
 var $ = require('jquery');
 require('es6-promise').polyfill();
-var Dispatcher = require('./dispatcher/AppDispatcher.js');
+var Actions = require('./actions/UploaderActions.js');
 var UploadConstants = require('./constants/UploadConstants.js');
 
 module.exports = (function() {
@@ -14,12 +14,7 @@ module.exports = (function() {
     $.post('/upload', $(this).serialize())
     .done(function(data) {
       //  can start polling scan results...
-      console.log(data);
-      Dispatcher.dispatch({
-        actionType: 'package-update',
-        state: UploadConstants.PACKAGE_SCANNING,
-        statusUrl: data.status_url
-      });
+      Actions.packageScan(data.status_url);
     })
     .fail(function(data) {
       // show error

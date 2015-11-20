@@ -1,62 +1,52 @@
 var $ = require('jquery');
-var React = require('react')
+var React = require('react');
 var ReactDOM = require('react-dom');
-var Dispatcher = require('../dispatcher/AppDispatcher.js');
 var Input = React.createFactory(require('./InputTypeFile.js'));
+var Message = React.createFactory(require('./Message.js'));
 var PackageStore = require('../stores/PackageStore.js');
 var UploadConstants = require('../constants/UploadConstants.js');
+var StringConstants = require('../constants/StringConstants.js');
+
+
+function getUploaderState() {
+  return {
+    // assertion: AssertionStore.get(),
+    packageUpload: PackageStore.getAll(),
+    message: StringConstants.SELECT_PACKAGE // messageStore
+  }
+};
 
 var Uploader = React.createClass({
 
   getInitialState: function() {
-    return PackageStore.getAll();
+    return getUploaderState();
   },
 
   componentDidMount: function() {
-    PackageStore.addChangeListener(this._onChange);
+    PackageStore.addChangeListener(this.handlePackageStoreChange);
   },
 
   componentWillUnmount: function() {
-    PackageStore.removeChangeListener(this._onChange);
+    PackageStore.removeChangeListener(this.handlePackageStoreChange);
   },
 
-  _onChange: function() {
-    var pkg = PackageStore.getAll();
-    this.setState({
-      package: pkg
-    });
+  handlePackageStoreChange: function() {
 
-    if (pkg.state === UploadConstants.PACKAGE_SCANNING) {
-      console.log('start scanning!');
-      console.log(pkg.statusUrl);
-      this.packageScan(pkg.statusUrl);
-    }
   },
 
-  packageScan: function(url) {
-    $.get(url)
-    .done(function(data) {
-      console.log('scanning...')
-      console.log(data);
-    })
-    .fail(function(err) {
-      console.log('fail')
-      console.log(err);
-    })
-    .always(function() {
-      console.log('always')
-    })
-  },
 
   render: function() {
-    return (
-      <Input
-      stateValue={this.state.state}
-      uploadUrl={this.props.uploadUrl}
-      statusUrl={this.state.statusUrl}
-      packageForm={this.props.packageForm} // XXX packageFormID
-      />
-    )
+    return <div>
+    <Input
+    uploadFields = {['upload_id', 'timestamp', 'signature']}
+    packageForm = {this.props.packageForm}
+    uploadUrl = {this.props.packageUploadUrl}
+    uploadData = {this.state.packageUploadData}
+    />
+    <Message
+    message = {this.state.message}
+    />
+    </div>
   }
 
 });

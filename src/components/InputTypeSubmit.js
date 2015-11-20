@@ -27,10 +27,8 @@ module.exports = React.createClass({
   },
 
   _onChange: function() {
-    // enable the submit button if the upload state is uploaded or better
-    // this would be more React like as a component
     this.setState({disabled:
-      (PackageStore.get('state') < UploadConstants.PACKAGE_UPLOADED)
+      (PackageStore.get('packageUpload.state') < UploadConstants.PACKAGE_UPLOADED)
     })
   },
 

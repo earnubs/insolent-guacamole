@@ -1,6 +1,7 @@
-var React = require('react');
 require('es6-promise').polyfill();
-var Dispatcher = require('../dispatcher/AppDispatcher.js');
+var $ = require('jquery');
+var React = require('react');
+var Actions = require('../actions/UploaderActions.js');
 var UploadConstants = require('../constants/UploadConstants.js');
 
 module.exports = React.createClass({
@@ -13,97 +14,50 @@ module.exports = React.createClass({
 
   getDefaultProps: function() {
     return {
-      multiple: false,
-      accept: '.snap, .click',
-      maxRetries: 1 // retry after error, then fail
+      multiple:   false,
+      accept:     '.snap, .click',
+      maxRetries: 1, // retry after error, then fail
+      progress:   0
     };
   },
 
   getInitialState: function() {
     return {
-      // initial state: ?
-      name: null,
-      progress: 0,
-      retries: 0
+      fileName: null,
+      uploadProgress: 0
     }
   },
 
   componentDidMount: function() {
+    var form;
+    var data = new FormData();
+    if (this.props.packageForm && this.props.uploadFields.length) {
+      form = document.getElementById(this.props.packageForm);
 
-    var form = document.getElementById(this.props.packageForm);
-
-    this.setState({
-      uploadId: form.elements.upload_id.value,
-      timestamp: form.elements.timestamp.value,
-      signature: form.elements.signature.value
-    });
-
-    this.xhr = new XMLHttpRequest();
-
-    this.xhr.onload = (e) => {
-      // XXX handle bad response
-      var response = JSON.parse(e.target.responseText);
-      var uploadId = response.upload_id;
-      Dispatcher.dispatch({
-        actionType: 'package-update',
-        state: UploadConstants.PACKAGE_UPLOADED,
-        uploadId: uploadId
-      });
-    };
-
-    this.xhr.upload.onprogress = (e) => {
-      this.setState({
-        progress: (e.lengthComputable ? (e.loaded / e.total) * 100 | 0 : 0)
-      });
-      Dispatcher.dispatch({
-        actionType: 'package-update',
-        state: UploadConstants.PACKAGE_UPLOADING
-      });
-    };
-
-    this.xhr.upload.onerror = (e) => {
-      this.setState(function(previousState, currentProps) {
-        return {retries: previousState.retry + 1};
-      });
-      Dispatcher.dispatch({
-        actionType: 'package-update',
-        state: UploadConstants.PACKAGE_RETRYING
+      this.props.uploadFields.forEach(function(item) {
+        data.append(item, form.elements[item].value);
       });
     }
+
+    this.setState({'uploadData': data});
   },
 
-  change: function(e) {
+  handleChange: function(e) {
     var file = e.target.files[0];
+    var data = this.state.uploadData;
+
+    data.append('package', file);
 
     if (!file) {
+      // XXX error
       return;
     }
 
     this.setState({
-      name: file.name,
-      progress: 0
+      fileName: file.name
     });
 
-    Dispatcher.dispatch({
-      actionType: 'package-update',
-      state: UploadConstants.PACKAGE_SELECTED,
-      name: file.name,
-      size: file.size,
-    });
-
-    this.uploadFile(file);
-  },
-
-  uploadFile: function(file) {
-    var data = new FormData();
-    data.append('package', file);
-    data.append('upload_id', this.state.uploadId);
-    data.append('timestamp', this.state.timestamp);
-    data.append('signature', this.state.sgnature);
-
-    this.xhr.open('POST', this.props.uploadUrl, true);
-
-    this.xhr.send(data);
+    Actions.startUpload(this.props.uploadUrl, data);
   },
 
   handleClick: function(e) {
@@ -113,20 +67,22 @@ module.exports = React.createClass({
     fileInput.click();
   },
 
+
   render: function() {
-    return (
-      <div onClick={ this.handleClick } style={{ backgroundColor: 'silver'}}>
-        <input
-        type="file"
-        ref="fileInput"
-        multiple={ this.props.multiple }
-        accept={ this.props.accept }
-        onChange={ this.change }
-        style={{ display: 'none' }}
-        />
-        <div>{ this.state.name }</div>
-        <div>{ this.state.progress }</div>
-      </div>
-    )
+    return <div
+    onClick = { this.handleClick }
+    style   = {{  backgroundColor: 'silver'}}
+    >
+      <input
+        type     = "file"
+        ref      = "fileInput"
+        multiple = { this.props.multiple }
+        accept   = { this.props.accept }
+        onChange = { this.handleChange }
+        style    = {{ display: 'none' }}
+      />
+      <div>{ this.state.fileName }</div>
+      <div>{ this.state.uploadProgress }</div>
+    </div>
   }
 });
