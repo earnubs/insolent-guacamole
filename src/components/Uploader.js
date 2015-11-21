@@ -1,6 +1,7 @@
 var $ = require('jquery');
 var React = require('react');
 var ReactDOM = require('react-dom');
+var Actions = require('../actions/UploaderActions.js');
 var Input = React.createFactory(require('./InputTypeFile.js'));
 var Message = React.createFactory(require('./Message.js'));
 var PackageStore = require('../stores/PackageStore.js');
@@ -23,6 +24,11 @@ var Uploader = React.createClass({
   },
 
   componentDidMount: function() {
+    if (this.props.packageUploadSignatureUrl) {
+      Actions.setPackageSignatureUrl(this.props.packageUploadSignatureUrl);
+    } else {
+      throw new Error('E_SIGNATURE_URL_UNSET');
+    }
     PackageStore.addChangeListener(this.handlePackageStoreChange);
   },
 

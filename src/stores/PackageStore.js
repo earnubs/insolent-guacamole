@@ -9,7 +9,9 @@ const CHANGE_EVENT = 'change';
 var _file = {
   status: null,
   progress: 0,
-  retries: 0
+  retries: 0,
+  name: null,
+  signatureUrl: null
 };
 
 var upload = function(url, data) {
@@ -31,33 +33,61 @@ var upload = function(url, data) {
 var handleUploadProgress = function(e) {
   _file.progress = (e.lengthComputable ? (e.loaded / e.total) * 100 | 0 : 0);
   _file.status = UploadConstants.UPLOAD_UPLOADING;
+
+  return _file;
 }
 
 var handleUploadDone = function(data, textStatus, jqXHR) {
   if (textStatus === 'success') {
     if (data && data.upload_id) {
-      //Actions.setUploadStatus(UploadConstants.UPLOAD_UPLOADED);
       _file.status = UploadConstants.UPLOAD_UPLOADED;
     }
   } else {
-    // retry
-      // check MAX_RETRIES ...
+    // REQUIRE CONFIG FOR MAX_RETRIES
+    if (_file.retries < 3) {
+      getUploadSignature(_file.signatureUrl);
+    }
   }
+
+  return _file;
 }
 
 var handleUploadFail = function(jqXHR, textStatus, errorThrown) {
   _file.retries += 1;
   _file.status = UploadConstants.UPLOAD_RETRYING;
+
+  return _file;
 }
 
 var handleUploadAlways = function() {
   PackageStore.emit(CHANGE_EVENT);
 };
 
+var getUploadSignature = function(url) {
+  console.log(url);
+  $.ajax(url)
+  .done(handleGetUploadSignatureDone)
+  .fail(handleGetUploadSignatureFail)
+  .always(handleGetUploadSignatureAlways)
+}
+
+var handleGetUploadSignatureDone = function(data, textStatus, jqXHR) {
+  console.log(textStatus, data);
+}
+
+var handleGetUploadSignatureFail = function(data, textStatus, jqXHR) {
+  console.log(textStatus, data);
+}
+
+var handleGetUploadSignatureAlways = function(data, textStatus, jqXHR) {
+  console.log(textStatus, data);
+}
+
 var scan = function(url) {
   $.ajax(url)
   .done(handleScanResultsDone)
   .fail(handleScanResultsFail)
+  .always(handleScanResultsAlways)
 }
 
 var handleScanResultsDone = function(data) {
@@ -66,14 +96,22 @@ var handleScanResultsDone = function(data) {
   // XXX handle failure too
   if (data && data.success) {
     _file.status = UploadConstants.UPLOAD_COMPLETE;
-    PackageStore.emit(CHANGE_EVENT);
+  } else {
+    // wait, scan again, test a poll count against a limit
   }
+
+  return _file;
 }
 
 var handleScanResultsFail = function(error) {
   console.log('fail')
   console.log(error);
   _file.status = UploadConstants.UPLOAD_FAILED;
+
+  return _file;
+}
+
+var handleScanResultsAlways = function(error) {
   PackageStore.emit(CHANGE_EVENT);
 }
 
@@ -103,6 +141,17 @@ var PackageStore = assign({}, EventEmitter.prototype, {
   dispatcherToken: Dispatcher.register(function(payload) {
 
     switch (payload.actionType) {
+      case UploadConstants.PACKAGE_SET_NAME:
+        _file.name = payload.name;
+        PackageStore.emit(CHANGE_EVENT);
+        break;
+
+      case UploadConstants.PACKAGE_SET_SIGNATURE_URL:
+        console.log(payload.url);
+        _file.signatureUrl = payload.url;
+        PackageStore.emit(CHANGE_EVENT);
+        break;
+
       case UploadConstants.PACKAGE_UPDATE_STATUS:
         console.log(payload.status);
         _file.status = payload.status;

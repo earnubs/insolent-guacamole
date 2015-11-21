@@ -9,8 +9,7 @@ ReactDOM.render(
   <Uploader
     submitButton='submit-form'
     packageUploadUrl='/unscanned-upload' // package upload url
-    formUrl='' // form post url
-    scanUrl='' // package scan api url
+    packageUploadSignatureUrl='/dev/click-apps/upload-signature/'
     packageForm='form-files'
   />,
   document.getElementById('uploader')
@@ -18,6 +17,7 @@ ReactDOM.render(
 
 ReactDOM.render(
   <Submit
+    formUrl='/upload' // form post url
   />,
   document.getElementById('submit-form')
 );

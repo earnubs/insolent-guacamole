@@ -44,18 +44,15 @@ module.exports = React.createClass({
 
   handleChange: function(e) {
     var file = e.target.files[0];
-    var data = this.state.uploadData;
-
-    data.append('package', file);
-
     if (!file) {
       // XXX error
       return;
     }
+    Actions.setPackageName(file.name);
 
-    this.setState({
-      fileName: file.name
-    });
+    var data = this.state.uploadData;
+
+    data.append('package', file);
 
     Actions.startUpload(this.props.uploadUrl, data);
   },
@@ -81,8 +78,8 @@ module.exports = React.createClass({
         onChange = { this.handleChange }
         style    = {{ display: 'none' }}
       />
-      <div>{ this.state.fileName }</div>
-      <div>{ this.state.uploadProgress }</div>
+      <div>{ this.props.name }</div>
+      <div>{ this.props.progress }</div>
     </div>
   }
 });
