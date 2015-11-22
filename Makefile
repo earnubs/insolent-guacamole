@@ -2,7 +2,7 @@ PATH  := node_modules/.bin:$(PATH)
 
 SOURCE = src/app.js
 TARGET = public/js/bundle.js
-FLAGS = -t [ babelify --presets [ es2015 react ] ]
+FLAGS = -t babelify
 UPLOADS = uploads/*
 
 all: build
