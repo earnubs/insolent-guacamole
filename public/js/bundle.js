@@ -29557,22 +29557,20 @@ module.exports = React.createClass({
   propTypes: {
     multiple: React.PropTypes.bool,
     accept: React.PropTypes.string,
-    placeholder: React.PropTypes.string
+    placeholder: React.PropTypes.string,
+    progress: React.PropTypes.number,
+    name: React.PropTypes.string,
+    uploadUrl: React.PropTypes.string.isRequired
   },
 
   getDefaultProps: function getDefaultProps() {
     return {
+      inputElClass: 'b-uploader__file-input',
+      filenameElClass: 'b-uploader__filename',
       multiple: false,
       accept: '.snap, .click',
-      maxRetries: 1, // retry after error, then fail
-      progress: 0
-    };
-  },
-
-  getInitialState: function getInitialState() {
-    return {
-      fileName: null,
-      uploadProgress: 0
+      progress: 0,
+      name: ''
     };
   },
 
@@ -29593,8 +29591,7 @@ module.exports = React.createClass({
   handleChange: function handleChange(e) {
     var file = e.target.files[0];
     if (!file) {
-      // XXX error
-      return;
+      return false;
     }
     Actions.setPackageName(file.name);
 
@@ -29603,6 +29600,7 @@ module.exports = React.createClass({
     data.append('package', file);
 
     Actions.startUpload(this.props.uploadUrl, data);
+    return true;
   },
 
   handleClick: function handleClick(e) {
@@ -29625,11 +29623,12 @@ module.exports = React.createClass({
         multiple: this.props.multiple,
         accept: this.props.accept,
         onChange: this.handleChange,
+        className: this.props.inputElClass,
         style: { display: 'none' }
       }),
       React.createElement(
         'div',
-        null,
+        { className: this.props.filenameElClass },
         this.props.name
       ),
       React.createElement(
@@ -29738,7 +29737,7 @@ var Uploader = React.createClass({
     if (this.props.packageUploadSignatureUrl) {
       Actions.setPackageSignatureUrl(this.props.packageUploadSignatureUrl);
     } else {
-      throw new Error('E_SIGNATURE_URL_UNSET');
+      console.error('packageUploadSignatureUrl must be set.');
     }
     PackageStore.addChangeListener(this.handlePackageStoreChange);
   },

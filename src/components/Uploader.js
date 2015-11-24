@@ -27,7 +27,7 @@ var Uploader = React.createClass({
     if (this.props.packageUploadSignatureUrl) {
       Actions.setPackageSignatureUrl(this.props.packageUploadSignatureUrl);
     } else {
-      throw new Error('E_SIGNATURE_URL_UNSET');
+      console.error('packageUploadSignatureUrl must be set.');
     }
     PackageStore.addChangeListener(this.handlePackageStoreChange);
   },

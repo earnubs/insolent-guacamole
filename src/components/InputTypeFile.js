@@ -7,25 +7,23 @@ var UploadConstants = require('../constants/UploadConstants.js');
 module.exports = React.createClass({
 
   propTypes: {
-    multiple: React.PropTypes.bool,
-    accept: React.PropTypes.string,
-    placeholder: React.PropTypes.string
+    multiple:    React.PropTypes.bool,
+    accept:      React.PropTypes.string,
+    placeholder: React.PropTypes.string,
+    progress:    React.PropTypes.number,
+    name:        React.PropTypes.string,
+    uploadUrl:   React.PropTypes.string.isRequired
   },
 
   getDefaultProps: function() {
     return {
-      multiple:   false,
-      accept:     '.snap, .click',
-      maxRetries: 1, // retry after error, then fail
-      progress:   0
+      inputElClass:    'b-uploader__file-input',
+      filenameElClass: 'b-uploader__filename',
+      multiple:        false,
+      accept:          '.snap, .click',
+      progress:        0,
+      name:            ''
     };
-  },
-
-  getInitialState: function() {
-    return {
-      fileName: null,
-      uploadProgress: 0
-    }
   },
 
   componentDidMount: function() {
@@ -45,8 +43,7 @@ module.exports = React.createClass({
   handleChange: function(e) {
     var file = e.target.files[0];
     if (!file) {
-      // XXX error
-      return;
+      return false;
     }
     Actions.setPackageName(file.name);
 
@@ -55,6 +52,7 @@ module.exports = React.createClass({
     data.append('package', file);
 
     Actions.startUpload(this.props.uploadUrl, data);
+    return true;
   },
 
   handleClick: function(e) {
@@ -64,21 +62,21 @@ module.exports = React.createClass({
     fileInput.click();
   },
 
-
   render: function() {
     return <div
     onClick = { this.handleClick }
     style   = {{  backgroundColor: 'silver'}}
     >
       <input
-        type     = "file"
-        ref      = "fileInput"
-        multiple = { this.props.multiple }
-        accept   = { this.props.accept }
-        onChange = { this.handleChange }
-        style    = {{ display: 'none' }}
+        type      = "file"
+        ref       = "fileInput"
+        multiple  = { this.props.multiple }
+        accept    = { this.props.accept }
+        onChange  = { this.handleChange }
+        className = { this.props.inputElClass }
+        style     = {{ display: 'none' }}
       />
-      <div>{ this.props.name }</div>
+      <div className={ this.props.filenameElClass }>{ this.props.name }</div>
       <div>{ this.props.progress }</div>
     </div>
   }
