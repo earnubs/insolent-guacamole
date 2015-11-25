@@ -4,12 +4,18 @@ var React = require('react');
 var Actions = require('../actions/UploaderActions.js');
 var UploadConstants = require('../constants/UploadConstants.js');
 
+var componentStyle = {
+  borderRadius: 3,
+  border: '3px dotted #ddd',
+  backgroundColor: '#efefef',
+  padding: 5
+};
+
 module.exports = React.createClass({
 
   propTypes: {
     multiple:    React.PropTypes.bool,
     accept:      React.PropTypes.string,
-    placeholder: React.PropTypes.string,
     progress:    React.PropTypes.number,
     name:        React.PropTypes.string,
     uploadUrl:   React.PropTypes.string.isRequired
@@ -22,19 +28,20 @@ module.exports = React.createClass({
       multiple:        false,
       accept:          '.snap, .click',
       progress:        0,
-      name:            ''
+      name:            'No file selected'
     };
   },
 
   componentDidMount: function() {
     var form;
-    var data = new FormData();
+    var data = {};
     if (this.props.packageForm && this.props.uploadFields.length) {
       form = document.getElementById(this.props.packageForm);
-
-      this.props.uploadFields.forEach(function(item) {
-        data.append(item, form.elements[item].value);
-      });
+      if (form) {
+        this.props.uploadFields.forEach(function(item) {
+          data[item] = form.elements[item].value;
+        });
+      }
     }
 
     this.setState({'uploadData': data});
@@ -45,13 +52,7 @@ module.exports = React.createClass({
     if (!file) {
       return false;
     }
-    Actions.setPackageName(file.name);
-
-    var data = this.state.uploadData;
-
-    data.append('package', file);
-
-    Actions.startUpload(this.props.uploadUrl, data);
+    Actions.startUpload(this.props.uploadUrl, file, this.state.uploadData);
     return true;
   },
 
@@ -65,7 +66,7 @@ module.exports = React.createClass({
   render: function() {
     return <div
     onClick = { this.handleClick }
-    style   = {{  backgroundColor: 'silver'}}
+    style   = { componentStyle }
     >
       <input
         type      = "file"

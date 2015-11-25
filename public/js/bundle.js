@@ -13783,6 +13783,7 @@ var HTMLDOMPropertyConfig = {
     multiple: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
     muted: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
     name: null,
+    nonce: MUST_USE_ATTRIBUTE,
     noValidate: HAS_BOOLEAN_VALUE,
     open: HAS_BOOLEAN_VALUE,
     optimum: null,
@@ -13794,6 +13795,7 @@ var HTMLDOMPropertyConfig = {
     readOnly: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
     rel: null,
     required: HAS_BOOLEAN_VALUE,
+    reversed: HAS_BOOLEAN_VALUE,
     role: MUST_USE_ATTRIBUTE,
     rows: MUST_USE_ATTRIBUTE | HAS_POSITIVE_NUMERIC_VALUE,
     rowSpan: null,
@@ -14239,6 +14241,7 @@ assign(React, {
 });
 
 React.__SECRET_DOM_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactDOM;
+React.__SECRET_DOM_SERVER_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = ReactDOMServer;
 
 module.exports = React;
 },{"./Object.assign":29,"./ReactDOM":42,"./ReactDOMServer":52,"./ReactIsomorphic":70,"./deprecated":113}],32:[function(require,module,exports){
@@ -24447,7 +24450,7 @@ module.exports = ReactUpdates;
 
 'use strict';
 
-module.exports = '0.14.2';
+module.exports = '0.14.3';
 },{}],92:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -29449,12 +29452,6 @@ var AppDispatcher = require('../dispatcher/AppDispatcher.js');
 var UploadConstants = require('../constants/UploadConstants.js');
 
 module.exports = {
-  setPackageName: function setPackageName(name) {
-    AppDispatcher.dispatch({
-      actionType: UploadConstants.PACKAGE_SET_NAME,
-      name: name
-    });
-  },
   setPackageSignatureUrl: function setPackageSignatureUrl(url) {
     AppDispatcher.dispatch({
       actionType: UploadConstants.PACKAGE_SET_SIGNATURE_URL,
@@ -29467,11 +29464,12 @@ module.exports = {
       status: status
     });
   },
-  startUpload: function startUpload(url, data) {
+  startUpload: function startUpload(url, file, data) {
     AppDispatcher.dispatch({
       actionType: UploadConstants.PACKAGE_START_UPLOAD,
-      url: url,
-      formData: data
+      uploadURL: url,
+      file: file,
+      data: data
     });
   },
   packageScan: function packageScan(url) {
@@ -29552,12 +29550,19 @@ var React = require('react');
 var Actions = require('../actions/UploaderActions.js');
 var UploadConstants = require('../constants/UploadConstants.js');
 
+var componentStyle = {
+  borderRadius: 3,
+  border: '3px dotted #ddd',
+  backgroundColor: '#efefef',
+  padding: 5
+};
+
 module.exports = React.createClass({
+  displayName: 'exports',
 
   propTypes: {
     multiple: React.PropTypes.bool,
     accept: React.PropTypes.string,
-    placeholder: React.PropTypes.string,
     progress: React.PropTypes.number,
     name: React.PropTypes.string,
     uploadUrl: React.PropTypes.string.isRequired
@@ -29570,19 +29575,20 @@ module.exports = React.createClass({
       multiple: false,
       accept: '.snap, .click',
       progress: 0,
-      name: ''
+      name: 'No file selected'
     };
   },
 
   componentDidMount: function componentDidMount() {
     var form;
-    var data = new FormData();
+    var data = {};
     if (this.props.packageForm && this.props.uploadFields.length) {
       form = document.getElementById(this.props.packageForm);
-
-      this.props.uploadFields.forEach(function (item) {
-        data.append(item, form.elements[item].value);
-      });
+      if (form) {
+        this.props.uploadFields.forEach(function (item) {
+          data[item] = form.elements[item].value;
+        });
+      }
     }
 
     this.setState({ 'uploadData': data });
@@ -29593,13 +29599,7 @@ module.exports = React.createClass({
     if (!file) {
       return false;
     }
-    Actions.setPackageName(file.name);
-
-    var data = this.state.uploadData;
-
-    data.append('package', file);
-
-    Actions.startUpload(this.props.uploadUrl, data);
+    Actions.startUpload(this.props.uploadUrl, file, this.state.uploadData);
     return true;
   },
 
@@ -29615,7 +29615,7 @@ module.exports = React.createClass({
       'div',
       {
         onClick: this.handleClick,
-        style: { backgroundColor: 'silver' }
+        style: componentStyle
       },
       React.createElement('input', {
         type: 'file',
@@ -29650,6 +29650,8 @@ var UploadConstants = require('../constants/UploadConstants.js');
 var PackageStore = require('../stores/PackageStore.js');
 
 module.exports = React.createClass({
+  displayName: 'exports',
+
   getDefaultProps: function getDefaultProps() {
     return {
       name: 'submitForm'
@@ -29697,6 +29699,8 @@ var Dispatcher = require('../dispatcher/AppDispatcher.js');
 var UploadConstants = require('../constants/UploadConstants.js');
 
 module.exports = React.createClass({
+  displayName: 'exports',
+
   render: function render() {
     return React.createElement(
       'div',
@@ -29728,6 +29732,7 @@ function getUploaderState() {
 };
 
 var Uploader = React.createClass({
+  displayName: 'Uploader',
 
   getInitialState: function getInitialState() {
     return getUploaderState();
@@ -29852,19 +29857,52 @@ var assign = require('object-assign');
 var UploadConstants = require('../constants/UploadConstants.js');
 
 var CHANGE_EVENT = 'change';
+var MAX_RETRIES = 1;
 
 var _file = {
   status: null,
   progress: 0,
   retries: 0,
   name: null,
-  signatureUrl: null
+  uploadURL: null,
+  signatureUrl: null,
+  file: null
 };
 
-var upload = function upload(url, data) {
+var parseJSONError = function parseJSONError(data) {
+  if (data && data.errors) {
+    for (var err in data.errors) {
+      data.errors[err].forEach(logErrorMessage);
+    }
+  }
+};
+
+var logErrorMessage = function logErrorMessage(message) {
+  // XXX do we want to send this to the user?
+  console.error(message);
+};
+
+var upload = function upload(url, file, data) {
+
+  console.log(url);
+  console.log(_file);
+
+  if (!file) {
+    return;
+    console.warn('upload called with no file');
+  }
+  var formData = new FormData();
+  formData.append('package', file);
+
+  if (data) {
+    for (var prop in data) {
+      formData.append(prop, data[prop]);
+    }
+  }
+
   $.ajax(url, {
     type: 'POST',
-    data: data,
+    data: formData,
     processData: false,
     xhr: (function () {
       var req = new XMLHttpRequest();
@@ -29882,14 +29920,21 @@ var handleUploadProgress = function handleUploadProgress(e) {
 };
 
 var handleUploadDone = function handleUploadDone(data, textStatus, jqXHR) {
+  //{"successful": false, "errors": {"timestamp": ["Timestamp is expired."]}}
+  // GET upload-signature
+  // upload again
+  // concat to log ?
+
   if (textStatus === 'success') {
     if (data && data.upload_id) {
       _file.status = UploadConstants.UPLOAD_UPLOADED;
     }
   } else {
     // REQUIRE CONFIG FOR MAX_RETRIES
-    if (_file.retries < 3) {
+    if (_file.retries < MAX_RETRIES) {
       getUploadSignature(_file.signatureUrl);
+    } else {
+      // send message to user: try again
     }
   }
 
@@ -29897,8 +29942,14 @@ var handleUploadDone = function handleUploadDone(data, textStatus, jqXHR) {
 };
 
 var handleUploadFail = function handleUploadFail(jqXHR, textStatus, errorThrown) {
-  _file.retries += 1;
+  console.warn('handleUploadFail: ', errorThrown);
+  parseJSONError(jqXHR.responseJSON);
+
   _file.status = UploadConstants.UPLOAD_RETRYING;
+
+  if (jqXHR.status === 400 && _file.retries < MAX_RETRIES) {
+    getUploadSignature(_file.signatureUrl);
+  }
 
   return _file;
 };
@@ -29908,21 +29959,19 @@ var handleUploadAlways = function handleUploadAlways() {
 };
 
 var getUploadSignature = function getUploadSignature(url) {
-  console.log(url);
   $.ajax(url).done(handleGetUploadSignatureDone).fail(handleGetUploadSignatureFail).always(handleGetUploadSignatureAlways);
 };
 
 var handleGetUploadSignatureDone = function handleGetUploadSignatureDone(data, textStatus, jqXHR) {
-  console.log(textStatus, data);
+  _file.retries++;
+  upload(_file.uploadURL, _file.file, data);
 };
 
 var handleGetUploadSignatureFail = function handleGetUploadSignatureFail(data, textStatus, jqXHR) {
   console.log(textStatus, data);
 };
 
-var handleGetUploadSignatureAlways = function handleGetUploadSignatureAlways(data, textStatus, jqXHR) {
-  console.log(textStatus, data);
-};
+var handleGetUploadSignatureAlways = function handleGetUploadSignatureAlways(data, textStatus, jqXHR) {};
 
 var scan = function scan(url) {
   $.ajax(url).done(handleScanResultsDone).fail(handleScanResultsFail).always(handleScanResultsAlways);
@@ -29978,13 +30027,8 @@ var PackageStore = assign({}, EventEmitter.prototype, {
   dispatcherToken: Dispatcher.register(function (payload) {
 
     switch (payload.actionType) {
-      case UploadConstants.PACKAGE_SET_NAME:
-        _file.name = payload.name;
-        PackageStore.emit(CHANGE_EVENT);
-        break;
 
       case UploadConstants.PACKAGE_SET_SIGNATURE_URL:
-        console.log(payload.url);
         _file.signatureUrl = payload.url;
         PackageStore.emit(CHANGE_EVENT);
         break;
@@ -29996,9 +30040,12 @@ var PackageStore = assign({}, EventEmitter.prototype, {
         break;
 
       case UploadConstants.PACKAGE_START_UPLOAD:
-        // XXX don't use bar url prop in case of fall through!
-        upload(payload.url, payload.formData);
+        upload(payload.uploadURL, payload.file, payload.data);
         _file.status = UploadConstants.UPLOAD_SELECTED;
+        //_file.formData = payload.formData;
+        _file.uploadURL = payload.uploadURL;
+        _file.file = payload.file;
+        _file.name = payload.file.name;
         PackageStore.emit(CHANGE_EVENT);
         break;
 

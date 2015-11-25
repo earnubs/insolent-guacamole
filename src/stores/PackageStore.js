@@ -5,29 +5,62 @@ var assign = require('object-assign');
 var UploadConstants = require('../constants/UploadConstants.js');
 
 const CHANGE_EVENT = 'change';
+const MAX_RETRIES = 1;
 
 var _file = {
   status: null,
   progress: 0,
   retries: 0,
   name: null,
-  signatureUrl: null
+  uploadURL: null,
+  signatureUrl: null,
+  file: null
 };
 
-var upload = function(url, data) {
-    $.ajax(url, {
-      type: 'POST',
-      data: data,
-      processData: false,
-      xhr: function() {
-        var req = new XMLHttpRequest();
-        req.upload.onprogress = handleUploadProgress;
-        return req;
-      }.bind(this)
-    })
-    .done(handleUploadDone)
-    .fail(handleUploadFail)
-    .always(handleUploadAlways)
+var parseJSONError = function(data) {
+  if (data && data.errors) {
+    for (var err in data.errors) {
+      data.errors[err].forEach(logErrorMessage);
+    }
+  }
+};
+
+var logErrorMessage = function(message) {
+  // XXX do we want to send this to the user?
+  console.error(message);
+};
+
+var upload = function(url, file, data) {
+
+  console.log(url);
+  console.log(_file);
+
+  if (!file) {
+    return;
+    console.warn('upload called with no file');
+  }
+  var formData = new FormData();
+  formData.append('package', file);
+
+  if (data) {
+    for (var prop in data) {
+      formData.append(prop, data[prop]);
+    }
+  }
+
+  $.ajax(url, {
+    type: 'POST',
+    data: formData,
+    processData: false,
+    xhr: function() {
+      var req = new XMLHttpRequest();
+      req.upload.onprogress = handleUploadProgress;
+      return req;
+    }.bind(this)
+  })
+  .done(handleUploadDone)
+  .fail(handleUploadFail)
+  .always(handleUploadAlways)
 }
 
 var handleUploadProgress = function(e) {
@@ -38,14 +71,21 @@ var handleUploadProgress = function(e) {
 }
 
 var handleUploadDone = function(data, textStatus, jqXHR) {
+//{"successful": false, "errors": {"timestamp": ["Timestamp is expired."]}}
+// GET upload-signature
+// upload again
+// concat to log ?
+
   if (textStatus === 'success') {
     if (data && data.upload_id) {
       _file.status = UploadConstants.UPLOAD_UPLOADED;
     }
   } else {
     // REQUIRE CONFIG FOR MAX_RETRIES
-    if (_file.retries < 3) {
+    if (_file.retries < MAX_RETRIES) {
       getUploadSignature(_file.signatureUrl);
+    } else {
+      // send message to user: try again
     }
   }
 
@@ -53,8 +93,14 @@ var handleUploadDone = function(data, textStatus, jqXHR) {
 }
 
 var handleUploadFail = function(jqXHR, textStatus, errorThrown) {
-  _file.retries += 1;
+  console.warn('handleUploadFail: ', errorThrown);
+  parseJSONError(jqXHR.responseJSON);
+
   _file.status = UploadConstants.UPLOAD_RETRYING;
+
+  if (jqXHR.status === 400 && _file.retries < MAX_RETRIES) {
+    getUploadSignature(_file.signatureUrl);
+  }
 
   return _file;
 }
@@ -64,7 +110,6 @@ var handleUploadAlways = function() {
 };
 
 var getUploadSignature = function(url) {
-  console.log(url);
   $.ajax(url)
   .done(handleGetUploadSignatureDone)
   .fail(handleGetUploadSignatureFail)
@@ -72,7 +117,8 @@ var getUploadSignature = function(url) {
 }
 
 var handleGetUploadSignatureDone = function(data, textStatus, jqXHR) {
-  console.log(textStatus, data);
+  _file.retries++;
+  upload(_file.uploadURL, _file.file, data);
 }
 
 var handleGetUploadSignatureFail = function(data, textStatus, jqXHR) {
@@ -80,7 +126,6 @@ var handleGetUploadSignatureFail = function(data, textStatus, jqXHR) {
 }
 
 var handleGetUploadSignatureAlways = function(data, textStatus, jqXHR) {
-  console.log(textStatus, data);
 }
 
 var scan = function(url) {
@@ -141,13 +186,8 @@ var PackageStore = assign({}, EventEmitter.prototype, {
   dispatcherToken: Dispatcher.register(function(payload) {
 
     switch (payload.actionType) {
-      case UploadConstants.PACKAGE_SET_NAME:
-        _file.name = payload.name;
-        PackageStore.emit(CHANGE_EVENT);
-        break;
 
       case UploadConstants.PACKAGE_SET_SIGNATURE_URL:
-        console.log(payload.url);
         _file.signatureUrl = payload.url;
         PackageStore.emit(CHANGE_EVENT);
         break;
@@ -159,9 +199,12 @@ var PackageStore = assign({}, EventEmitter.prototype, {
         break;
 
       case UploadConstants.PACKAGE_START_UPLOAD:
-        // XXX don't use bar url prop in case of fall through!
-        upload(payload.url, payload.formData);
+        upload(payload.uploadURL, payload.file, payload.data);
         _file.status = UploadConstants.UPLOAD_SELECTED;
+        //_file.formData = payload.formData;
+        _file.uploadURL = payload.uploadURL;
+        _file.file = payload.file;
+        _file.name = payload.file.name;
         PackageStore.emit(CHANGE_EVENT);
         break;
 

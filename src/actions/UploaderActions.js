@@ -3,12 +3,6 @@ var UploadConstants = require('../constants/UploadConstants.js');
 
 
 module.exports = {
-  setPackageName: function(name) {
-    AppDispatcher.dispatch({
-      actionType: UploadConstants.PACKAGE_SET_NAME,
-      name: name
-    })
-  },
   setPackageSignatureUrl: function(url) {
     AppDispatcher.dispatch({
       actionType: UploadConstants.PACKAGE_SET_SIGNATURE_URL,
@@ -21,11 +15,12 @@ module.exports = {
       status: status
     })
   },
-  startUpload: function(url, data) {
+  startUpload: function(url, file, data) {
     AppDispatcher.dispatch({
       actionType: UploadConstants.PACKAGE_START_UPLOAD,
-      url: url,
-      formData: data
+      uploadURL: url,
+      file: file,
+      data: data
     })
   },
   packageScan: function(url) {
