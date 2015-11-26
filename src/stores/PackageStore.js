@@ -1,4 +1,5 @@
 var $ = require('jquery');
+var _ = require('lodash');
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
 var EventEmitter = require('events').EventEmitter;
 var assign = require('object-assign');
@@ -6,11 +7,16 @@ var UploadConstants = require('../constants/UploadConstants.js');
 
 const CHANGE_EVENT = 'change';
 const MAX_RETRIES = 1;
+const POLL_INTERVAL = 1000;
+const MAX_POLL = 250; // ~ 5 mins
 
+// XXX consider what we want to expose to components and what we do not,
+// so maybe split this along those lines
 var _file = {
   status: null,
   progress: 0,
   retries: 0,
+  polls: 0,
   name: null,
   uploadURL: null,
   signatureUrl: null,
@@ -96,10 +102,13 @@ var handleUploadFail = function(jqXHR, textStatus, errorThrown) {
   console.warn('handleUploadFail: ', errorThrown);
   parseJSONError(jqXHR.responseJSON);
 
-  _file.status = UploadConstants.UPLOAD_RETRYING;
-
-  if (jqXHR.status === 400 && _file.retries < MAX_RETRIES) {
+  if (_file.retries < MAX_RETRIES) {
+    _file.status = UploadConstants.UPLOAD_RETRYING;
     getUploadSignature(_file.signatureUrl);
+  } else {
+    // XXX message to user
+    console.warn('Upload failed, please try again.')
+    _file.status = UploadConstants.UPLOAD_FAILED;
   }
 
   return _file;
@@ -113,7 +122,6 @@ var getUploadSignature = function(url) {
   $.ajax(url)
   .done(handleGetUploadSignatureDone)
   .fail(handleGetUploadSignatureFail)
-  .always(handleGetUploadSignatureAlways)
 }
 
 var handleGetUploadSignatureDone = function(data, textStatus, jqXHR) {
@@ -122,10 +130,8 @@ var handleGetUploadSignatureDone = function(data, textStatus, jqXHR) {
 }
 
 var handleGetUploadSignatureFail = function(data, textStatus, jqXHR) {
+  // XXX message to user
   console.log(textStatus, data);
-}
-
-var handleGetUploadSignatureAlways = function(data, textStatus, jqXHR) {
 }
 
 var scan = function(url) {
@@ -136,19 +142,26 @@ var scan = function(url) {
 }
 
 var handleScanResultsDone = function(data) {
-  // TODO polling, timeout
-  console.log('scanning...')
-  // XXX handle failure too
+  // XXX examine api results, message, url, etc...
+
+  _file.polls++;
+
   if (data && data.success) {
     _file.status = UploadConstants.UPLOAD_COMPLETE;
+  } else if (_file.polls < MAX_POLL) {
+    _.delay(scan, POLL_INTERVAL, _file.scanURL);
+    console.log(_file.polls);
   } else {
-    // wait, scan again, test a poll count against a limit
+    // XXX 'pollScanResultsSuccess:poll-timeout'
+    console.log('poll timeout');
   }
 
   return _file;
 }
 
 var handleScanResultsFail = function(error) {
+  // we could try asking for the page again, though probably better to fail
+  // and ask the user to upload again
   console.log('fail')
   console.log(error);
   _file.status = UploadConstants.UPLOAD_FAILED;
@@ -209,8 +222,9 @@ var PackageStore = assign({}, EventEmitter.prototype, {
         break;
 
       case UploadConstants.PACKAGE_SCAN:
-        scan(payload.url);
+        scan(payload.scanURL);
         _file.status = UploadConstants.UPLOAD_SCANNING;
+        _file.scanURL = payload.scanURL;
         PackageStore.emit(CHANGE_EVENT);
         break;
     }

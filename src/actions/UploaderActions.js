@@ -26,7 +26,7 @@ module.exports = {
   packageScan: function(url) {
     AppDispatcher.dispatch({
       actionType: UploadConstants.PACKAGE_SCAN,
-      url: url
+      scanURL: url
     })
   },
 }

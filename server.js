@@ -12,7 +12,6 @@ app.get('/', function (req, res) {
 
 // in reality this is a CORS request with an additional OPTIONS preflight req
 app.post('/unscanned-upload', upload.single('package'), function (req, res, next) {
-  console.log(req.body);
   res.set('Content-Type', 'application/json');
   res.status(202).json({ upload_id: 'iama-uploadid' })
   //res.status(500)
@@ -42,7 +41,7 @@ app.get('/dev/click-apps/upload-signature/', function (req, res, next) {
 app.get('/click-scan-complete/updown/myid', function (req, res, next) {
   res.set('Content-Type', 'application/json');
   res.json({
-    success: true
+    success: false
   })
 });
 
