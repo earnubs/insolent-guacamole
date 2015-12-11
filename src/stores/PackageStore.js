@@ -1,5 +1,6 @@
 var $ = require('jquery');
 var _ = require('lodash');
+var Actions = require('../actions/UploaderActions.js');
 var Dispatcher = require('../dispatcher/AppDispatcher.js');
 var EventEmitter = require('events').EventEmitter;
 var assign = require('object-assign');
@@ -10,14 +11,13 @@ const MAX_RETRIES = 1;
 const POLL_INTERVAL = 1000;
 const MAX_POLL = 250; // ~ 5 mins
 
-// XXX consider what we want to expose to components and what we do not,
-// so maybe split this along those lines
-var _file = {
-  status: null,
+var _packageUpload = {
+  id: null,
+  condition: null,
   progress: 0,
   retries: 0,
   polls: 0,
-  name: null,
+  name: '',
   uploadURL: null,
   signatureUrl: null,
   file: null
@@ -38,15 +38,14 @@ var logErrorMessage = function(message) {
 
 var upload = function(url, file, data) {
 
-  console.log(url);
-  console.log(_file);
+  var formData = new FormData();
 
   if (!file) {
-    return;
     console.warn('upload called with no file');
+    return;
   }
-  var formData = new FormData();
-  formData.append('package', file);
+
+  formData.append('binary', file);
 
   if (data) {
     for (var prop in data) {
@@ -58,6 +57,7 @@ var upload = function(url, file, data) {
     type: 'POST',
     data: formData,
     processData: false,
+    contentType: false,
     xhr: function() {
       var req = new XMLHttpRequest();
       req.upload.onprogress = handleUploadProgress;
@@ -70,10 +70,14 @@ var upload = function(url, file, data) {
 }
 
 var handleUploadProgress = function(e) {
-  _file.progress = (e.lengthComputable ? (e.loaded / e.total) * 100 | 0 : 0);
-  _file.status = UploadConstants.UPLOAD_UPLOADING;
+  var progress = (e.lengthComputable ? (e.loaded / e.total) * 100 | 0 : 0)
+  progress = Math.min(Math.max(progress, 0), 100);
+  Actions.setUpload({
+    progress: progress,
+    condition: UploadConstants.UPLOAD_UPLOADING
+  });
 
-  return _file;
+  return _packageUpload;
 }
 
 var handleUploadDone = function(data, textStatus, jqXHR) {
@@ -84,34 +88,38 @@ var handleUploadDone = function(data, textStatus, jqXHR) {
 
   if (textStatus === 'success') {
     if (data && data.upload_id) {
-      _file.status = UploadConstants.UPLOAD_UPLOADED;
+      _packageUpload.condition = UploadConstants.UPLOAD_UPLOADED;
+      Actions.setUpload({
+        id: data.upload_id
+      });
     }
   } else {
-    // REQUIRE CONFIG FOR MAX_RETRIES
-    if (_file.retries < MAX_RETRIES) {
-      getUploadSignature(_file.signatureUrl);
+    // XXX require('config.js') CONFIG FOR MAX_RETRIES
+    if (_packageUpload.retries < MAX_RETRIES) {
+      getUploadSignature(_packageUpload.signatureUrl);
     } else {
-      // send message to user: try again
+      // XXX send message to user: try again
+      // XXX ravenjs throw exception
     }
   }
 
-  return _file;
+  return _packageUpload;
 }
 
 var handleUploadFail = function(jqXHR, textStatus, errorThrown) {
   console.warn('handleUploadFail: ', errorThrown);
   parseJSONError(jqXHR.responseJSON);
 
-  if (_file.retries < MAX_RETRIES) {
-    _file.status = UploadConstants.UPLOAD_RETRYING;
-    getUploadSignature(_file.signatureUrl);
+  if (_packageUpload.retries < MAX_RETRIES) {
+    _packageUpload.condition = UploadConstants.UPLOAD_RETRYING;
+    getUploadSignature(_packageUpload.signatureUrl);
   } else {
     // XXX message to user
     console.warn('Upload failed, please try again.')
-    _file.status = UploadConstants.UPLOAD_FAILED;
+    _packageUpload.condition = UploadConstants.UPLOAD_FAILED;
   }
 
-  return _file;
+  return _packageUpload;
 }
 
 var handleUploadAlways = function() {
@@ -125,8 +133,11 @@ var getUploadSignature = function(url) {
 }
 
 var handleGetUploadSignatureDone = function(data, textStatus, jqXHR) {
-  _file.retries++;
-  upload(_file.uploadURL, _file.file, data);
+  Actions.setUpload({
+    id: data.upload_id
+  });
+  _packageUpload.retries++; // XXX use action
+  upload(_packageUpload.uploadURL, _packageUpload.file, data); // XXX use action
 }
 
 var handleGetUploadSignatureFail = function(data, textStatus, jqXHR) {
@@ -144,19 +155,30 @@ var scan = function(url) {
 var handleScanResultsDone = function(data) {
   // XXX examine api results, message, url, etc...
 
-  _file.polls++;
+  _packageUpload.polls++;
 
-  if (data && data.success) {
-    _file.status = UploadConstants.UPLOAD_COMPLETE;
-  } else if (_file.polls < MAX_POLL) {
-    _.delay(scan, POLL_INTERVAL, _file.scanURL);
-    console.log(_file.polls);
+  if (data && data.completed) {
+    _packageUpload.condition = UploadConstants.UPLOAD_COMPLETE;
+
+    if (data.application_url) {
+      window.location.replace(data.application_url);
+    } else {
+      // XXX action et message
+      console.log(data.message);
+    }
+
+  } else if (_packageUpload.polls < MAX_POLL) {
+    if (data && data.message) {
+      // XXX action set message
+      console.log(data.message);
+    }
+    _.delay(scan, POLL_INTERVAL, _packageUpload.scanURL);
   } else {
     // XXX 'pollScanResultsSuccess:poll-timeout'
     console.log('poll timeout');
   }
 
-  return _file;
+  return _packageUpload;
 }
 
 var handleScanResultsFail = function(error) {
@@ -164,9 +186,9 @@ var handleScanResultsFail = function(error) {
   // and ask the user to upload again
   console.log('fail')
   console.log(error);
-  _file.status = UploadConstants.UPLOAD_FAILED;
+  _packageUpload.condition = UploadConstants.UPLOAD_FAILED;
 
-  return _file;
+  return _packageUpload;
 }
 
 var handleScanResultsAlways = function(error) {
@@ -180,11 +202,15 @@ var handleScanResultsAlways = function(error) {
 var PackageStore = assign({}, EventEmitter.prototype, {
 
   get: function(key) {
-    return _file[key];
+    if (key in _packageUpload) {
+      return _packageUpload[key];
+    }
+
+    throw new Error('KeyError: ' + key + ' not found in PackageStore');
   },
 
   getAll: function() {
-    return _file;
+    return _packageUpload;
   },
 
   addChangeListener: function(callback) {
@@ -200,31 +226,40 @@ var PackageStore = assign({}, EventEmitter.prototype, {
 
     switch (payload.actionType) {
 
-      case UploadConstants.PACKAGE_SET_SIGNATURE_URL:
-        _file.signatureUrl = payload.url;
+      case UploadConstants.UPLOAD_UPDATE:
+        var obj = payload.upload;
+        // assign only if _file has that property
+        _.assign(_packageUpload, _.pick(obj, _.keys(_packageUpload)));
+
         PackageStore.emit(CHANGE_EVENT);
         break;
 
-      case UploadConstants.PACKAGE_UPDATE_STATUS:
-        console.log(payload.status);
-        _file.status = payload.status;
+      case UploadConstants.UPLOAD_POLL:
+        _packageUpload.polls++;
+
+        PackageStore.emit(CHANGE_EVENT);
+        break;
+
+      case UploadConstants.UPLOAD_RETRY:
+        _packageUpload.retries++;
+
         PackageStore.emit(CHANGE_EVENT);
         break;
 
       case UploadConstants.PACKAGE_START_UPLOAD:
         upload(payload.uploadURL, payload.file, payload.data);
-        _file.status = UploadConstants.UPLOAD_SELECTED;
+        _packageUpload.condition = UploadConstants.UPLOAD_SELECTED;
         //_file.formData = payload.formData;
-        _file.uploadURL = payload.uploadURL;
-        _file.file = payload.file;
-        _file.name = payload.file.name;
+        _packageUpload.uploadURL = payload.uploadURL;
+        _packageUpload.file = payload.file;
+        _packageUpload.name = payload.file.name;
         PackageStore.emit(CHANGE_EVENT);
         break;
 
       case UploadConstants.PACKAGE_SCAN:
         scan(payload.scanURL);
-        _file.status = UploadConstants.UPLOAD_SCANNING;
-        _file.scanURL = payload.scanURL;
+        _packageUpload.condition = UploadConstants.UPLOAD_SCANNING;
+        _packageUpload.scanURL = payload.scanURL;
         PackageStore.emit(CHANGE_EVENT);
         break;
     }

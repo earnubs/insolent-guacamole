@@ -3,15 +3,14 @@ require('es6-promise').polyfill();
 var Actions = require('./actions/UploaderActions.js');
 var UploadConstants = require('./constants/UploadConstants.js');
 
-module.exports = (function() {
+module.exports = function() {
 
-  var form = $('#upload-form');
+  var form = $('#form-upload');
 
-  form.on('submit', sendForm);
-
-  function sendForm(e) {
+  form.submit(function(e) { 
     e.preventDefault();
-    $.post('/upload', $(this).serialize())
+
+    $.post($(this).baseURI, $(this).serialize())
     .done(function(data) {
       //  can start polling scan results...
       Actions.packageScan(data.status_url);
@@ -21,6 +20,6 @@ module.exports = (function() {
       console.log('fail');
       console.log(data);
     });
-  };
+  });
 
-})();
+};

@@ -3,18 +3,25 @@ var UploadConstants = require('../constants/UploadConstants.js');
 
 
 module.exports = {
-  setPackageSignatureUrl: function(url) {
+  setUpload: function(upload) {
     AppDispatcher.dispatch({
-      actionType: UploadConstants.PACKAGE_SET_SIGNATURE_URL,
-      url: url
+      actionType: UploadConstants.UPLOAD_UPDATE,
+      upload: upload
     })
   },
-  setUploadStatus: function(status) {
+
+  uploadHasBeenRetried: function() {
     AppDispatcher.dispatch({
-      actionType: UploadConstants.PACKAGE_UPDATE_STATUS,
-      status: status
+      actionType: UploadConstants.UPLOAD_RETRY
     })
   },
+
+  uploadHasBeenPolled: function() {
+    AppDispatcher.dispatch({
+      actionType: UploadConstants.UPLOAD_POLL
+    })
+  },
+
   startUpload: function(url, file, data) {
     AppDispatcher.dispatch({
       actionType: UploadConstants.PACKAGE_START_UPLOAD,
@@ -22,6 +29,8 @@ module.exports = {
       file: file,
       data: data
     })
+
+    // XXX call PackageStore:upload from here, but via util...
   },
   packageScan: function(url) {
     AppDispatcher.dispatch({

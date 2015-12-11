@@ -8,7 +8,8 @@ var componentStyle = {
   borderRadius: 3,
   border: '3px dotted #ddd',
   backgroundColor: '#efefef',
-  padding: 5
+  padding: 15,
+  position: 'relative'
 };
 
 module.exports = React.createClass({
@@ -28,8 +29,22 @@ module.exports = React.createClass({
       multiple:        false,
       accept:          '.snap, .click',
       progress:        0,
-      name:            'No file selected'
+      name:            ''
     };
+  },
+
+  getProgressBarStyle: function() {
+    var p = this.props.progress;
+
+    return {
+      position: 'absolute',
+      left: 5,
+      right: 5,
+      bottom: 3,
+      backgroundImage: `linear-gradient(to right, #19B6EE 0%,#19B6EE ${p}%,
+        transparent ${p}%,transparent ${p}%,transparent 100%)`,
+      height:3
+    }
   },
 
   componentDidMount: function() {
@@ -78,7 +93,7 @@ module.exports = React.createClass({
         style     = {{ display: 'none' }}
       />
       <div className={ this.props.filenameElClass }>{ this.props.name }</div>
-      <div>{ this.props.progress }</div>
+      <div style={ this.getProgressBarStyle() } ></div>
     </div>
   }
 });

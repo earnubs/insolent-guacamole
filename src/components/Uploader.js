@@ -10,11 +10,7 @@ var StringConstants = require('../constants/StringConstants.js');
 
 
 function getUploaderState() {
-  return {
-    // assertion: AssertionStore.get(),
-    packageUpload: PackageStore.getAll(),
-    message: StringConstants.SELECT_PACKAGE // messageStore
-  }
+  return PackageStore.getAll();
 };
 
 var Uploader = React.createClass({
@@ -25,7 +21,9 @@ var Uploader = React.createClass({
 
   componentDidMount: function() {
     if (this.props.packageUploadSignatureUrl) {
-      Actions.setPackageSignatureUrl(this.props.packageUploadSignatureUrl);
+      Actions.setUpload({
+        signatureURL: this.props.packageUploadSignatureUrl
+      });
     } else {
       console.error('packageUploadSignatureUrl must be set.');
     }
@@ -37,21 +35,20 @@ var Uploader = React.createClass({
   },
 
   handlePackageStoreChange: function() {
-
+    this.setState(getUploaderState());
   },
-
 
   render: function() {
     return <div>
     <Input
-    uploadFields = {['upload_id', 'timestamp', 'signature']}
+    uploadFields = {['upload_id', 'timestamp', 'signature']} // XXX set
     packageForm = {this.props.packageForm}
     uploadUrl = {this.props.packageUploadUrl}
     uploadData = {this.state.packageUploadData}
+    name = {this.state.name || 'No file selected' }
+    progress = {this.state.progress}
     />
-    <Message
-    message = {this.state.message}
-    />
+    <Message message = {this.state.condition} />
     </div>
   }
 
